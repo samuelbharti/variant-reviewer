@@ -3,7 +3,7 @@
 # Edit these values to match your brand. Spec: https://posit-dev.github.io/brand-yml/
 
 meta:
-  name: My App
+  name: Variant Reviewer
 
 color:
   palette:

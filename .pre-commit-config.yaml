@@ -8,20 +8,32 @@ exclude: "^(renv/|data/|docs/)"
 
 repos:
   # R code formatting with air (matches air.toml; same formatter rstudio/shiny uses).
-  - repo: https://github.com/posit-dev/air
-    rev: v0.9.0
+  - repo: https://github.com/posit-dev/air-pre-commit
+    rev: 0.10.0
     hooks:
       - id: air-format
 
-  # R-specific lint and safety checks.
-  - repo: https://github.com/lorenzwalthert/precommit
-    rev: v0.4.3
+  # R safety checks. lintr and parsability are enforced in CI (.github/
+  # workflows/ci.yaml); these local checks use pygrep so they need no R
+  # install (the lorenzwalthert/precommit hooks build their own R env, which
+  # fails on R-devel toolchains without prebuilt binaries).
+  - repo: local
     hooks:
-      - id: lintr
-      - id: parsable-R
       - id: no-browser-statement
+        name: no browser() statements
+        entry: 'browser\('
+        language: pygrep
+        files: '\.R$'
       - id: no-debug-statement
+        name: no debug()/debugonce() statements
+        entry: '\bdebug(once)?\('
+        language: pygrep
+        files: '\.R$'
       - id: no-print-statement
+        name: no print() statements
+        entry: '\bprint\('
+        language: pygrep
+        files: '\.R$'
         exclude: "^dev/"
 
   # Generic hygiene.
@@ -36,6 +48,14 @@ repos:
         args: ["--maxkb=2000"]
       - id: check-yaml
       - id: check-merge-conflict
+      # Block obvious secrets from being committed.
+      - id: detect-private-key
+
+  # Secret scanning: catch tokens, keys, and credentials before they land.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
 
   # Catch common spelling mistakes in code and docs.
   - repo: https://github.com/codespell-project/codespell
@@ -43,3 +63,6 @@ repos:
     hooks:
       - id: codespell
         args: ["--ignore-words-list=ans,fo"]
+        # Skip the generated lockfile (author/package names) and the
+        # boilerplate code of conduct.
+        exclude: "^(renv\\.lock|CODE_OF_CONDUCT\\.md)$"

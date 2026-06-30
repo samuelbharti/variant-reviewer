@@ -14,10 +14,13 @@ if (!file.exists("renv.lock")) {
     "shiny",
     "bslib",
     "brand.yml",
-    "dplyr",
     "ggplot2",
-    "DT",
-    "plotly"
+    "httr2",
+    "reactable",
+    "jsonlite",
+    "shinycssloaders",
+    "shinytest2",
+    "testthat"
   ))
   renv::snapshot()
   message(
