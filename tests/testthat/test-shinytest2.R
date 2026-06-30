@@ -1,22 +1,38 @@
-# End-to-end smoke test: launch the real app in a headless browser and confirm
-# it starts and the example module reacts to input.
+# End-to-end smoke test: launch the real app in a headless browser.
 # Skipped automatically when no Chrome/Chromium is available.
 
-test_that("app launches and the counter responds to clicks", {
+test_that("app launches with the search controls present", {
   testthat::skip_if_not_installed("shinytest2")
 
   app <- shinytest2::AppDriver$new(
     app_dir = test_path("..", ".."),
     name = "app-smoke",
-    height = 800,
-    width = 1000
+    height = 900,
+    width = 1200
   )
   withr::defer(app$stop())
 
-  # The counter module is mounted on the Home tab as "home_counter".
-  expect_equal(app$get_value(output = "home_counter-value"), "Current value: 0")
+  # The search module mounts a gene input and a submit button.
+  expect_no_error(app$get_value(input = "search-gene"))
+})
 
-  app$click("home_counter-increment")
-  app$wait_for_idle()
-  expect_equal(app$get_value(output = "home_counter-value"), "Current value: 1")
+test_that("searching a gene populates the gene summary card", {
+  testthat::skip_if_not_installed("shinytest2")
+  # Hits live APIs; skip on CI to keep the pipeline deterministic.
+  testthat::skip_on_ci()
+
+  app <- shinytest2::AppDriver$new(
+    app_dir = test_path("..", ".."),
+    name = "app-gene-search",
+    height = 900,
+    width = 1200
+  )
+  withr::defer(app$stop())
+
+  app$set_inputs(`search-gene` = "TP53")
+  app$click("search-submit")
+  app$wait_for_idle(timeout = 30000)
+
+  html <- app$get_html("#gene_summary-content")
+  expect_match(html, "TP53")
 })

@@ -1,0 +1,1 @@
+{"took":4,"total":3,"max_score":16.116037,"hits":[{"_id":"chr7:g.140453136A>G","_score":16.116037,"cadd":{"_license":"http://bit.ly/2TIuab9","phred":21.2},"dbnsfp":{"_license":"http://bit.ly/2VLnQBz","genename":["BRAF","BRAF","BRAF","BRAF"],"hgvsp":["p.Val600Ala","p.Val640Ala","p.V600A","p.Val207Ala"]},"dbsnp":{"_license":"http://bit.ly/2AqoLOc","rsid":"rs113488022"}}]}
