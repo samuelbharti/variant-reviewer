@@ -33,10 +33,11 @@ jobs:
             any::shiny
             any::bslib
             any::brand.yml
-            any::dplyr
             any::ggplot2
-            any::DT
-            any::plotly
+            any::httr2
+            any::reactable
+            any::jsonlite
+            any::shinycssloaders
       - name: Lint
         run: |
           lints <- lintr::lint_dir(".")
@@ -67,10 +68,11 @@ jobs:
             any::shiny
             any::bslib
             any::brand.yml
-            any::dplyr
             any::ggplot2
-            any::DT
-            any::plotly
+            any::httr2
+            any::reactable
+            any::jsonlite
+            any::shinycssloaders
             any::shinytest2
             any::testthat
       - name: Run tests (app smoke test)
