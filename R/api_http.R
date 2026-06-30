@@ -1,12 +1,13 @@
-# Shared HTTP helper for all external API clients.
+# Shared HTTP helpers for all external API clients.
 #
-# Every client funnels through vr_api_get() so timeouts, retries, and error
-# handling live in one place. The return value is always a normalized list so
-# callers never need their own tryCatch():
+# Every client funnels through vr_api_get() (REST) or vr_api_post_json()
+# (GraphQL/JSON POST) so timeouts, retries, and error handling live in one
+# place. The return value is always a normalized list so callers never need
+# their own tryCatch():
 #   list(ok = TRUE,  status = 200L, data = <parsed JSON>)
 #   list(ok = FALSE, status = <int|NA>, error = "<message>", data = NULL)
 
-# A friendly label for the source of a failed request, used in error messages.
+# GET a REST endpoint. `source` is a friendly label used in error messages.
 vr_api_get <- function(
   base_url,
   path = NULL,
@@ -24,12 +25,36 @@ vr_api_get <- function(
     query <- query[!vapply(query, is_blank, logical(1))]
     req <- do.call(httr2::req_url_query, c(list(req), query))
   }
+  req <- vr_req_defaults(req, timeout, max_tries)
+  vr_perform(req, source)
+}
+
+# POST a JSON body (e.g. a GraphQL query) and parse the JSON response.
+vr_api_post_json <- function(
+  url,
+  body,
+  source = "API",
+  timeout = 20,
+  max_tries = 3
+) {
+  req <- httr2::request(url)
+  req <- httr2::req_body_json(req, body)
+  req <- vr_req_defaults(req, timeout, max_tries)
+  vr_perform(req, source)
+}
+
+# Apply the shared request options (timeout, retries, no-raise, user agent).
+vr_req_defaults <- function(req, timeout, max_tries) {
   req <- httr2::req_timeout(req, timeout)
   req <- httr2::req_retry(req, max_tries = max_tries)
   # Don't let httr2 raise on HTTP errors; we normalize them ourselves.
   req <- httr2::req_error(req, is_error = function(resp) FALSE)
-  req <- httr2::req_user_agent(req, "variant-reviewer (Shiny app)")
+  httr2::req_user_agent(req, "variant-reviewer (Shiny app)")
+}
 
+# Perform a request and normalize the result into the standard ok/status/data
+# /error list.
+vr_perform <- function(req, source) {
   tryCatch(
     {
       resp <- httr2::req_perform(req)

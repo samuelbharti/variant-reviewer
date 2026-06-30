@@ -99,6 +99,18 @@ test_that("protvar_parse_position() pulls the residue number", {
   expect_null(protvar_parse_position(NULL))
 })
 
+test_that("opentargets_parse_rows() builds a disease/score data.frame", {
+  rows <- read_fixture(
+    "opentargets_tp53.json"
+  )$data$target$associatedDiseases$rows
+  df <- opentargets_parse_rows(rows)
+
+  expect_named(df, c("disease", "disease_id", "score"))
+  expect_match(df$disease_id[1], "^MONDO_")
+  expect_true(all(df$score >= 0 & df$score <= 1))
+  expect_equal(df$score, sort(df$score, decreasing = TRUE)) # API returns sorted
+})
+
 test_that("external_links_build() only includes links with ids present", {
   full <- external_links_build(list(
     symbol = "TP53",

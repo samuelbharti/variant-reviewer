@@ -14,6 +14,7 @@ The app is a thin, reactive front end over several public bioinformatics APIs:
 | Protein context           | ProtVar (EBI) |
 | Tissue expression         | GTEx     |
 | Protein interactions      | STRING   |
+| Disease associations      | Open Targets |
 | External resource links   | derived  |
 
 All sources are public and require no API key.
