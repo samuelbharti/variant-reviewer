@@ -89,7 +89,9 @@ The search module emits a reactive query `{gene, variant}`. `server.R` resolves
 the gene **once** via MyGene (symbol → Ensembl / Entrez / UniProt) and shares
 that with every gene-level module, so each API is queried only when needed. API
 clients are pure R (in `R/`, individually testable); modules only orchestrate
-reactivity and rendering. Adding a new source (e.g. ClinVar, gnomAD,
+reactivity and rendering. Successful HTTP responses are cached in-process for 30
+minutes (at the `vr_api_get()`/`vr_api_post_json()` chokepoint), so repeated
+searches are instant; failures are never cached. Adding a new source (e.g. ClinVar, gnomAD,
 Open Targets) is a new `R/api_*.R` + `modules/*_mod.R` pair dropped into the
 dashboard grid.
 

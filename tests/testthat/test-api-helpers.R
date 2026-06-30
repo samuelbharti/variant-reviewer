@@ -27,3 +27,39 @@ test_that("vr_num() formats numbers and handles missing", {
   expect_equal(vr_num(NA), "—")
   expect_equal(vr_num(NULL), "—")
 })
+
+test_that("vr_cache_key() is stable and distinguishes inputs", {
+  expect_identical(
+    vr_cache_key("GET", "a", list(x = 1)),
+    vr_cache_key("GET", "a", list(x = 1))
+  )
+  expect_false(identical(vr_cache_key("GET", "a"), vr_cache_key("GET", "b")))
+})
+
+test_that("vr_cached() caches successes but not failures", {
+  vr_cache$reset()
+
+  ok_calls <- 0
+  ok_fetch <- function() {
+    ok_calls <<- ok_calls + 1
+    list(ok = TRUE, data = ok_calls)
+  }
+  key_ok <- vr_cache_key("test", "ok")
+  first <- vr_cached(key_ok, ok_fetch)
+  second <- vr_cached(key_ok, ok_fetch)
+  expect_equal(first$data, 1)
+  expect_equal(second$data, 1) # served from cache, not re-fetched
+  expect_equal(ok_calls, 1)
+
+  fail_calls <- 0
+  fail_fetch <- function() {
+    fail_calls <<- fail_calls + 1
+    list(ok = FALSE, error = "boom")
+  }
+  key_fail <- vr_cache_key("test", "fail")
+  vr_cached(key_fail, fail_fetch)
+  vr_cached(key_fail, fail_fetch)
+  expect_equal(fail_calls, 2) # failures are not cached
+
+  vr_cache$reset()
+})
