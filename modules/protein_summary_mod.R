@@ -12,11 +12,13 @@ protein_summary_ui <- function(id) {
   )
 }
 
-# resolved: reactive() -> mygene_resolve() result (for UniProt accession).
-# search:   reactive() -> list(gene, variant) (for the protein position).
-protein_summary_server <- function(id, resolved, search) {
+# resolved:   reactive() -> mygene_resolve() result (for UniProt accession).
+# search:     reactive() -> list(gene, variant) (for the protein position).
+# annotation: reactive() -> myvariant_annotate() result (shared; supplies the
+#             protein position for rsID/HGVS inputs via its hgvsp).
+protein_summary_server <- function(id, resolved, search, annotation) {
   moduleServer(id, function(input, output, session) {
-    annotation <- reactive({
+    protein <- reactive({
       res <- resolved()
       query <- search()
       if (
@@ -30,7 +32,7 @@ protein_summary_server <- function(id, resolved, search) {
       if (is_blank(res$uniprot)) {
         return(list(ok = FALSE, error = "No UniProt accession for this gene."))
       }
-      position <- protein_resolve_position(query$variant)
+      position <- protein_resolve_position(query$variant, annotation())
       if (is.null(position)) {
         return(list(
           ok = FALSE,
@@ -41,7 +43,7 @@ protein_summary_server <- function(id, resolved, search) {
     })
 
     output$content <- renderUI({
-      res <- annotation()
+      res <- protein()
       if (is.null(res)) {
         return(vr_empty("Enter a variant to see protein-level context."))
       }
@@ -61,13 +63,13 @@ protein_summary_server <- function(id, resolved, search) {
 }
 
 # Derive a protein position from the variant string. For an rsID/HGVS input the
-# digits are not a protein position, so resolve via MyVariant's protein change
-# (hgvsp); otherwise treat the input as a protein change (e.g. "R175H").
-protein_resolve_position <- function(variant) {
+# digits are not a protein position, so use the supplied MyVariant annotation's
+# protein change (hgvsp); otherwise treat the input as a protein change
+# (e.g. "R175H") and parse it directly.
+protein_resolve_position <- function(variant, annotation = NULL) {
   if (myvariant_is_queryable(variant)) {
-    ann <- myvariant_annotate(variant)
-    if (isTRUE(ann$ok) && !is_blank(ann$hgvsp)) {
-      return(protvar_parse_position(ann$hgvsp))
+    if (isTRUE(annotation$ok) && !is_blank(annotation$hgvsp)) {
+      return(protvar_parse_position(annotation$hgvsp))
     }
     return(NULL)
   }

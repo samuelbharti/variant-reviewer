@@ -12,17 +12,10 @@ variant_summary_ui <- function(id) {
   )
 }
 
-# search: reactive() returning list(gene, variant) or NULL.
-variant_summary_server <- function(id, search) {
+# annotation: reactive() returning the myvariant_annotate() result, or NULL when
+# no variant was supplied.
+variant_summary_server <- function(id, annotation) {
   moduleServer(id, function(input, output, session) {
-    annotation <- reactive({
-      query <- search()
-      if (is.null(query) || is_blank(query$variant)) {
-        return(NULL)
-      }
-      myvariant_annotate(query$variant)
-    })
-
     output$content <- renderUI({
       res <- annotation()
       if (is.null(res)) {
