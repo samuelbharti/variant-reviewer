@@ -5,7 +5,10 @@ external_links_ui <- function(id) {
   ns <- NS(id)
   card(
     card_header("External resources"),
-    card_body(uiOutput(ns("content")))
+    card_body(shinycssloaders::withSpinner(
+      uiOutput(ns("content")),
+      proxy.height = "80px"
+    ))
   )
 }
 
