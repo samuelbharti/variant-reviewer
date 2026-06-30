@@ -33,5 +33,6 @@ function(input, output, session) {
   )
   gtex_expression_server("gtex", resolved)
   string_ppi_server("string_ppi", resolved)
+  opentargets_server("opentargets", resolved)
   external_links_server("links", resolved)
 }

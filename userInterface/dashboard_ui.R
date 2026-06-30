@@ -8,10 +8,11 @@ dashboard_page <- tagList(
     variant_summary_ui("variant_summary"),
     protein_summary_ui("protein_summary")
   ),
+  gtex_expression_ui("gtex"),
   layout_columns(
-    col_widths = c(7, 5),
-    gtex_expression_ui("gtex"),
-    string_ppi_ui("string_ppi")
+    col_widths = c(6, 6),
+    string_ppi_ui("string_ppi"),
+    opentargets_ui("opentargets")
   ),
   external_links_ui("links")
 )
