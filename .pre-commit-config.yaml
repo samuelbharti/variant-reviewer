@@ -36,6 +36,14 @@ repos:
         args: ["--maxkb=2000"]
       - id: check-yaml
       - id: check-merge-conflict
+      # Block obvious secrets from being committed.
+      - id: detect-private-key
+
+  # Secret scanning: catch tokens, keys, and credentials before they land.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
 
   # Catch common spelling mistakes in code and docs.
   - repo: https://github.com/codespell-project/codespell
