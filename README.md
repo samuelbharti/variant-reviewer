@@ -1,115 +1,113 @@
-# Project Title
+# Variant Reviewer
 
-<!-- template:strip:start -->
-> **Using this template:** click **Use this template** on GitHub (or
-> `npx degit SamuelBharti/RShiny_template my-app`), then run
-> `Rscript dev/use_template.R --project_name="My App" --author="Your Name"`
-> to set your project name, author, and version. This block, the citation
-> files, and the template machinery are removed automatically.
+A lightweight gene and variant interpretation companion, built with Shiny. Enter
+a gene symbol (and, optionally, a variant) to pull together — on a single
+dashboard — what the gene does, where it is expressed, what it interacts with,
+and protein-level context for the variant.
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19968600.svg)](https://doi.org/10.5281/zenodo.19968600)
-<!-- template:strip:end -->
+The app is a thin, reactive front end over several public bioinformatics APIs:
 
-Add a short description of your application.
+| Card / section            | Source   |
+| ------------------------- | -------- |
+| Gene summary              | MyGene   |
+| Variant annotation        | MyVariant |
+| Protein context           | ProtVar (EBI) |
+| Tissue expression         | GTEx     |
+| Protein interactions      | STRING   |
+| External resource links   | derived  |
 
-Current app version: v2.2
+All sources are public and require no API key.
 
 ## Requirements
 
 - R (>= 4.3)
-- RStudio (optional)
-- Packages used by the app (managed with `renv` recommended)
+- Packages managed with `renv` (see `renv.lock`)
 
 ## Installation
-
-### Option 1: Using renv (recommended)
 
 ```r
 if (!requireNamespace("renv", quietly = TRUE)) {
   install.packages("renv")
 }
-
 renv::restore()
 ```
 
-### Option 2: Manual package installation
+Or install the core packages manually:
 
 ```r
 install.packages(c(
-  "shiny",
-  "bslib",
-  "brand.yml",
-  "dplyr",
-  "ggplot2",
-  "DT",
-  "plotly"
+  "shiny", "bslib", "brand.yml", "ggplot2",
+  "httr2", "reactable", "jsonlite", "shinycssloaders"
 ))
 ```
 
-## How To Run
+## How to run
 
 ```r
 shiny::runApp()
 ```
 
-Or open the project in RStudio and click Run App.
+Or open the project in RStudio and click **Run App**.
 
-## Build And Run With Docker
+## Build and run with Docker
 
 ```bash
-docker build -t my-shiny-app .
-docker run --rm -p 3838:3838 my-shiny-app
+docker build -t variant-reviewer .
+docker run --rm -p 3838:3838 variant-reviewer
 ```
 
 Then open [http://localhost:3838](http://localhost:3838).
 
-This template expects a project-level `renv.lock` file and `renv/` metadata to be present in the app you create from it.
-
-## Project Structure
+## Project structure
 
 ```txt
 .
 ├── _brand.yml              # Brand colors, fonts, logo (theming)
-├── global.R                # Libraries and global objects
-├── ui.R                    # App UI definition
-├── server.R                # App server logic
-├── R/                      # Utility functions
-├── modules/                # Reusable Shiny modules
-├── userInterface/          # Page-level UI components
-├── data/                   # App data files
-├── dev/                    # Local development scripts
-├── www/                    # Static assets (css/js/img)
-└── docs/                   # Project documentation
+├── global.R                # Libraries and component loading
+├── ui.R                    # Single-page dashboard layout
+├── server.R                # Wires search -> resolved gene -> result modules
+├── R/                      # Pure-R API clients + helpers (no Shiny)
+│   ├── api_http.R          # Shared httr2 GET wrapper (timeouts, retries, errors)
+│   ├── api_mygene.R        # Gene resolution
+│   ├── api_myvariant.R     # Variant annotation
+│   ├── api_protvar.R       # Protein-level context
+│   ├── api_gtex.R          # Tissue expression
+│   ├── api_string.R        # Interaction partners
+│   └── ui_helpers.R        # Small presentation helpers
+├── modules/                # Shiny modules (one card each)
+├── userInterface/          # Page-level layout (dashboard_ui.R)
+├── tests/                  # testthat unit/reactive tests + shinytest2 e2e
+└── docs/                   # Project documentation, including docs/plans/
 ```
 
-## Deployment
+### Architecture
 
-Recommended deployment paths:
+The search module emits a reactive query `{gene, variant}`. `server.R` resolves
+the gene **once** via MyGene (symbol → Ensembl / Entrez / UniProt) and shares
+that with every gene-level module, so each API is queried only when needed. API
+clients are pure R (in `R/`, individually testable); modules only orchestrate
+reactivity and rendering. Adding a new source (e.g. ClinVar, gnomAD,
+Open Targets) is a new `R/api_*.R` + `modules/*_mod.R` pair dropped into the
+dashboard grid.
 
-- Posit Publisher or Posit Connect for direct app publishing
-- Docker image deployment when you want a containerized release
+## Testing
 
-CI/CD-driven publishing is not included here by default unless you explicitly add and maintain it for a given app.
+```r
+shiny::runTests(".")
+```
+
+- **Parser tests** (`tests/testthat/test-api-parsers.R`) run offline against
+  recorded JSON fixtures in `tests/testthat/fixtures/`.
+- **Reactive tests** (`test-modules.R`) use `shiny::testServer()`.
+- **End-to-end** (`test-shinytest2.R`) launches the app in a headless browser;
+  the live-API search test is skipped on CI for determinism (run locally with
+  `NOT_CRAN=true`).
 
 ## Theming
 
 Branding lives in [`_brand.yml`](_brand.yml) — colors, fonts, and logo in one
-place. It is applied automatically by bslib via `bs_theme(brand = TRUE)` in
-[ui.R](ui.R). Edit `_brand.yml` to restyle the whole app; no other changes are
-needed. To also theme plots and tables, install
-[`thematic`](https://rstudio.github.io/thematic/) — `global.R` picks it up
-automatically when present. See [docs/theming.md](docs/theming.md).
+place, applied by bslib via `bs_theme(brand = TRUE)` in [ui.R](ui.R).
 
 ## Contributing
 
-See CONTRIBUTING.md for contribution guidelines.
-
-<!-- template:strip:start -->
----
-
-Template developed by [samuelbharti](https://github.com/SamuelBharti).
-
-## How to cite
-
-If you use this template or a derived project, please cite it. Machine-readable citation metadata is available in `CITATION.cff`, and a human-readable example is provided in `CITATION.md`.
-<!-- template:strip:end -->
+See [CONTRIBUTING.md](CONTRIBUTING.md).
