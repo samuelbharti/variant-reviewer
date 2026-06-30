@@ -51,6 +51,7 @@ function(input, output, session) {
   )
   clinvar_server("clinvar", variant_rsid)
   gnomad_server("gnomad", variant_rsid)
+  ensembl_server("ensembl", variant_rsid)
   gtex_expression_server("gtex", resolved)
   string_ppi_server("string_ppi", resolved)
   opentargets_server("opentargets", resolved)

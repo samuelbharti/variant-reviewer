@@ -13,6 +13,7 @@ dashboard_page <- tagList(
     clinvar_ui("clinvar"),
     gnomad_ui("gnomad")
   ),
+  ensembl_ui("ensembl"),
   gtex_expression_ui("gtex"),
   layout_columns(
     col_widths = c(6, 6),
