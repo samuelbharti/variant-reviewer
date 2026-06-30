@@ -34,20 +34,26 @@ gene_search_ui <- function(id) {
   )
 }
 
-# Returns reactive(list(gene = <chr>, variant = <chr|NULL>)), updated only when
-# the user submits a non-empty gene.
+# Returns a reactive carrying list(gene = <chr>, variant = <chr|NULL>), or NULL
+# before the first submit (and when the gene is blank). A reactiveVal is used
+# instead of eventReactive so reading it before any submit yields NULL rather
+# than a silent error, which lets the result cards show their initial
+# placeholder messages.
 gene_search_server <- function(id) {
   moduleServer(id, function(input, output, session) {
-    eventReactive(input$submit, {
+    query <- reactiveVal(NULL)
+    observeEvent(input$submit, {
       gene <- trimws(input$gene %||% "")
       if (gene == "") {
-        return(NULL)
+        query(NULL)
+        return()
       }
       variant <- trimws(input$variant %||% "")
-      list(
+      query(list(
         gene = gene,
         variant = if (variant == "") NULL else variant
-      )
+      ))
     })
+    query
   })
 }

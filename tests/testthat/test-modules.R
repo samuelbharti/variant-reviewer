@@ -1,7 +1,11 @@
 # Reactive-logic tests for modules using shiny::testServer() (no browser).
 
-test_that("gene_search_server emits the query on submit", {
+test_that("gene_search_server is NULL before submit, emits the query after", {
   testServer(gene_search_server, {
+    # Before any submit the value is NULL (not an error), so result cards can
+    # show their placeholder messages.
+    expect_null(session$returned())
+
     session$setInputs(gene = "TP53", variant = "R175H", submit = 1)
     query <- session$returned()
     expect_equal(query$gene, "TP53")
