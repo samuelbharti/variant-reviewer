@@ -8,6 +8,11 @@ dashboard_page <- tagList(
     variant_summary_ui("variant_summary"),
     protein_summary_ui("protein_summary")
   ),
+  layout_columns(
+    col_widths = c(6, 6),
+    clinvar_ui("clinvar"),
+    gnomad_ui("gnomad")
+  ),
   gtex_expression_ui("gtex"),
   layout_columns(
     col_widths = c(6, 6),
