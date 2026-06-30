@@ -111,6 +111,31 @@ test_that("opentargets_parse_rows() builds a disease/score data.frame", {
   expect_equal(df$score, sort(df$score, decreasing = TRUE)) # API returns sorted
 })
 
+test_that("clinvar_parse_record() extracts classification and conditions", {
+  record <- read_fixture("clinvar_40389.json")
+  res <- clinvar_parse_record(record, uid = "40389")
+
+  expect_true(res$ok)
+  expect_equal(res$uid, "40389")
+  expect_equal(res$significance, "Pathogenic")
+  expect_match(res$review_status, "expert panel")
+  expect_match(res$conditions, "RASopathy")
+  expect_match(res$accession, "^VCV")
+})
+
+test_that("gnomad_freq_part() normalizes a frequency block and handles NULL", {
+  part <- gnomad_freq_part(list(af = 1.37e-6, ac = 2, an = 1460618))
+  expect_equal(part$ac, 2)
+  expect_equal(part$an, 1460618)
+  expect_true(part$af > 0)
+  expect_null(gnomad_freq_part(NULL))
+})
+
+test_that("gnomad_fmt_af() keeps tiny frequencies readable", {
+  expect_equal(gnomad_fmt_af(1.37e-6), "1.37e-06")
+  expect_equal(gnomad_fmt_af(NA), "—")
+})
+
 test_that("external_links_build() only includes links with ids present", {
   full <- external_links_build(list(
     symbol = "TP53",
