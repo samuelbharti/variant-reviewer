@@ -13,3 +13,9 @@ renv/staging/
 
 # Local development helpers
 dev/.Rhistory
+
+# Local agent/plan/scratch artifacts (keep docs/plans/ tracked)
+.claude/
+/plans/
+/skills/
+scratchpad/
