@@ -2,6 +2,13 @@
 library(shiny)
 library(bslib)
 
+# bs_theme(brand = TRUE) in ui.R reads _brand.yml via the {brand.yml} package.
+# This reference keeps it visible to renv (it is otherwise a phantom dependency)
+# and fails fast with a clear message if it is missing.
+if (!requireNamespace("brand.yml", quietly = TRUE)) {
+  stop("The 'brand.yml' package is required (used by bs_theme(brand = TRUE)).")
+}
+
 # Optionally theme base/ggplot/lattice output to match the app theme. Activates
 # only if the {thematic} package is installed, so it adds no hard dependency.
 if (requireNamespace("thematic", quietly = TRUE)) {
