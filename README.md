@@ -12,6 +12,8 @@ The app is a thin, reactive front end over several public bioinformatics APIs:
 | Gene summary              | MyGene   |
 | Variant annotation        | MyVariant |
 | Protein context           | ProtVar (EBI) |
+| Clinical significance     | ClinVar (NCBI E-utilities) |
+| Population frequency       | gnomAD   |
 | Tissue expression         | GTEx     |
 | Protein interactions      | STRING   |
 | Disease associations      | Open Targets |
