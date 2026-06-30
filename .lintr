@@ -1,6 +1,7 @@
 linters: linters_with_defaults(
     line_length_linter(120),
-    object_name_linter(styles = c("snake_case", "camelCase")),
+    # SNAKE_CASE allows SCREAMING_SNAKE constants (e.g. MYGENE_BASE).
+    object_name_linter(styles = c("snake_case", "camelCase", "SNAKE_CASE")),
     commented_code_linter = NULL,
     indentation_linter = NULL,
     # This is a Shiny app, not a package, so there is no namespace for
