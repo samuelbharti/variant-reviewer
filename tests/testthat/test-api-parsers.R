@@ -136,6 +136,45 @@ test_that("gnomad_fmt_af() keeps tiny frequencies readable", {
   expect_equal(gnomad_fmt_af(NA), "—")
 })
 
+test_that("ensembl_parse_vep() extracts consequence summary and table", {
+  record <- read_fixture("ensembl_vep_rs113488022.json")
+  res <- ensembl_parse_vep(record)
+
+  expect_true(res$ok)
+  expect_equal(res$most_severe, "missense_variant")
+  expect_s3_class(res$data, "data.frame")
+  expect_named(
+    res$data,
+    c("gene", "transcript", "consequence", "impact", "sift", "polyphen")
+  )
+  expect_true(all(res$data$gene == "BRAF"))
+})
+
+test_that("ensembl_consequences_df() keeps only protein-coding rows", {
+  coding <- list(
+    list(
+      biotype = "protein_coding",
+      gene_symbol = "BRAF",
+      transcript_id = "T1",
+      consequence_terms = list("missense_variant"),
+      impact = "MODERATE"
+    ),
+    list(
+      biotype = "retained_intron",
+      gene_symbol = "BRAF",
+      transcript_id = "T2",
+      consequence_terms = list("intron_variant"),
+      impact = "MODIFIER"
+    )
+  )
+  df <- ensembl_consequences_df(coding)
+  expect_equal(nrow(df), 1)
+  expect_equal(df$transcript, "T1")
+
+  expect_null(ensembl_consequences_df(NULL))
+  expect_null(ensembl_consequences_df(list(list(biotype = "lncRNA"))))
+})
+
 test_that("external_links_build() only includes links with ids present", {
   full <- external_links_build(list(
     symbol = "TP53",
