@@ -88,8 +88,57 @@ vr_req_defaults <- function(req, timeout, max_tries) {
   httr2::req_user_agent(req, "variant-reviewer (Shiny app)")
 }
 
-# Perform a request and normalize the result into the standard ok/status/data
-# /error list.
+# Turn a low-level failure -- a non-2xx HTTP status, or a curl/transport error
+# (timeout, DNS, connection refused) -- into a short, plain-language message that
+# is safe to show a user. It never leaks curl/httr2 internals; the raw cause is
+# kept separately (the result's `detail` field) for server-side logs only.
+# `source` is the friendly API label passed through from the client.
+vr_http_error_message <- function(
+  source,
+  status = NA_integer_,
+  condition = NULL
+) {
+  if (!is.na(status)) {
+    if (status == 404) {
+      return(paste0("No ", source, " data was found for this query."))
+    }
+    if (status == 429) {
+      return(paste0(
+        source,
+        " is busy right now (too many requests). Please try again in a moment."
+      ))
+    }
+    if (status >= 500) {
+      return(paste0(
+        source,
+        " is temporarily unavailable. Please try again shortly."
+      ))
+    }
+    return(paste0("Couldn't retrieve data from ", source, " right now."))
+  }
+  raw <- tolower(paste(
+    if (is.null(condition)) "" else conditionMessage(condition),
+    collapse = " "
+  ))
+  if (grepl("timeout|timed out", raw)) {
+    return(paste0(
+      source,
+      " took too long to respond. Please try again shortly."
+    ))
+  }
+  if (grepl("resolve|name or service|dns|offline|could not connect", raw)) {
+    return(paste0(
+      "Couldn't reach ",
+      source,
+      " — please check your internet connection and try again."
+    ))
+  }
+  paste0(source, " is temporarily unavailable. Please try again shortly.")
+}
+
+# Perform a request and normalize the result into the standard list. On failure
+# `error` carries the user-facing message and `detail` the raw cause (logged to
+# the server console via message(), never shown to the user).
 vr_perform <- function(req, source) {
   tryCatch(
     {
@@ -105,23 +154,30 @@ vr_perform <- function(req, source) {
             check_type = FALSE,
             simplifyVector = FALSE
           ),
-          error = NULL
+          error = NULL,
+          detail = NULL
         )
       } else {
+        detail <- paste0(source, " returned HTTP ", status)
+        message("[variant-reviewer] ", detail)
         list(
           ok = FALSE,
           status = status,
           data = NULL,
-          error = paste0(source, " returned HTTP ", status, ".")
+          error = vr_http_error_message(source, status = status),
+          detail = detail
         )
       }
     },
     error = function(e) {
+      detail <- paste0("Could not reach ", source, ": ", conditionMessage(e))
+      message("[variant-reviewer] ", detail)
       list(
         ok = FALSE,
         status = NA_integer_,
         data = NULL,
-        error = paste0("Could not reach ", source, ": ", conditionMessage(e))
+        error = vr_http_error_message(source, condition = e),
+        detail = detail
       )
     }
   )
