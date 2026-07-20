@@ -188,6 +188,60 @@ function(input, output, session) {
     )
   }
 
+  # Demo button (navbar): load a worked example so every card populates, then
+  # open a short guide covering the dashboard and how to use the assistant.
+  observeEvent(input$demo, {
+    load_selection(.gene_search_example$gene, .gene_search_example$variant)
+    showModal(modalDialog(
+      title = paste0("Demo: ", .gene_search_example$label),
+      easyClose = TRUE,
+      size = "l",
+      footer = modalButton("Got it"),
+      tags$p(
+        "Loaded ",
+        tags$strong(.gene_search_example$label),
+        " into the dashboard. Each card is now populated for this gene and",
+        " variant — scroll the results to explore:"
+      ),
+      tags$ul(
+        tags$li(
+          tags$strong("Gene / Variant / Protein"),
+          " — identity, annotation, and protein context."
+        ),
+        tags$li(
+          tags$strong("ClinVar / gnomAD / Consequences"),
+          " — clinical significance, population frequency, and predicted effect."
+        ),
+        tags$li(
+          tags$strong("Expression / Interactions / Diseases"),
+          " — GTEx tissue expression, STRING partners, and Open Targets associations."
+        )
+      ),
+      tags$p(
+        "Each card links out to its source, and the expand icon opens a card",
+        " full-screen."
+      ),
+      tags$hr(),
+      tags$p(tags$strong("Using the AI assistant")),
+      tags$ol(
+        tags$li(
+          "Open ",
+          tags$strong("Model & key"),
+          " (top-right of the chat panel)."
+        ),
+        tags$li(
+          "Connect a provider — a key set in the environment is used",
+          " automatically, otherwise paste your own (kept only in this session)."
+        ),
+        tags$li(
+          "Ask about the loaded gene/variant, or click one of the example",
+          " prompts. The assistant can read the cards and load new",
+          " genes/variants for you."
+        )
+      )
+    ))
+  })
+
   # Assistant tools, scoped to this app: read the loaded selection, read any
   # card's data, and load a gene/variant. Guarded on ellmer being installed;
   # the chat module itself degrades gracefully when it is not.
@@ -272,13 +326,8 @@ function(input, output, session) {
       "statistics, or citations; say when you don't know."
     ),
     tools = chat_tools,
-    # Clickable example prompts, shown as suggestion cards once connected.
-    # Names are the short card headings; values are sent as the message.
-    suggestions = c(
-      "Gene overview" = "Load TP53 and summarize what it does and its top disease associations.",
-      "Variant significance" = "Is BRAF V600E (rs113488022) pathogenic? Cite ClinVar and its gnomAD frequency.",
-      "Tissue expression" = "Load BRCA1 and tell me which tissues express it most highly.",
-      "Interactions" = "What are the top STRING interaction partners for EGFR?"
-    )
+    # Example prompts: fill-to-edit chips at the input and suggestion cards in
+    # the connected greeting (shared constant, see R/chat_tools.R).
+    suggestions = VR_CHAT_SUGGESTIONS
   )
 }

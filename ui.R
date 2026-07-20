@@ -36,6 +36,17 @@ page_navbar(
     icon = icon("circle-info"),
     div(class = "px-2 px-lg-4 py-3", about_page)
   ),
+  # Right-aligned demo button: loads a worked example into the dashboard and
+  # explains how to use the app and the assistant (wired in server.R).
+  nav_spacer(),
+  nav_item(
+    actionButton(
+      "demo",
+      "Demo",
+      icon = icon("wand-magic-sparkles"),
+      class = "btn-sm btn-outline-primary"
+    )
+  ),
   footer = tags$footer(
     class = "border-top text-center text-muted small py-3 px-2",
     sprintf("Variant Reviewer v%s", app_version()),
