@@ -74,6 +74,285 @@ myvariant_parse_hit <- function(hit, term = NA_character_) {
   )
 }
 
+# In-silico pathogenicity predictions for a variant, from dbNSFP (+ CADD) via
+# MyVariant. Same query style as myvariant_annotate(), so it resolves the same
+# hit. Returns:
+#   list(ok = TRUE, predictions = list(list(name, score, call), ...))
+#   list(ok = FALSE, error = "...")
+myvariant_predictions <- function(variant) {
+  if (is_blank(variant)) {
+    return(list(ok = FALSE, error = "No variant supplied."))
+  }
+  if (!myvariant_is_queryable(variant)) {
+    return(list(
+      ok = FALSE,
+      error = "Enter an rsID (rs...) or HGVS for in-silico predictions."
+    ))
+  }
+  term <- trimws(as.character(variant))
+  res <- vr_api_get(
+    MYVARIANT_BASE,
+    path = "query",
+    query = list(
+      q = term,
+      size = 1,
+      fields = paste(
+        "cadd.phred",
+        "dbnsfp.revel",
+        "dbnsfp.alphamissense",
+        "dbnsfp.sift",
+        "dbnsfp.polyphen2",
+        "dbnsfp.metalr",
+        "dbnsfp.metasvm",
+        sep = ","
+      )
+    ),
+    source = "MyVariant"
+  )
+  if (!res$ok) {
+    return(list(ok = FALSE, error = res$error))
+  }
+  hits <- res$data$hits
+  if (is.null(hits) || length(hits) == 0) {
+    return(list(
+      ok = FALSE,
+      error = paste0("No predictions found for '", term, "'.")
+    ))
+  }
+  myvariant_parse_predictions(hits[[1]])
+}
+
+# dbNSFP prediction-code dictionaries (per predictor). Codes come as a scalar or
+# a per-transcript array; the parser collapses them to one representative call.
+.mv_pred_maps <- list(
+  alphamissense = c(
+    P = "likely pathogenic",
+    B = "likely benign",
+    A = "ambiguous"
+  ),
+  polyphen2 = c(D = "probably damaging", P = "possibly damaging", B = "benign"),
+  sift = c(D = "deleterious", T = "tolerated"),
+  meta = c(D = "damaging", T = "tolerated")
+)
+
+# Max numeric across a scalar/array (most-damaging), NA if none.
+.mv_max_num <- function(x) {
+  if (is.null(x)) {
+    return(NA_real_)
+  }
+  v <- suppressWarnings(as.numeric(unlist(x, use.names = FALSE)))
+  v <- v[!is.na(v)]
+  if (length(v) == 0) NA_real_ else max(v)
+}
+
+# First non-empty prediction code mapped through `map`, NA if none.
+.mv_call <- function(x, map) {
+  codes <- unlist(x, use.names = FALSE)
+  codes <- codes[nzchar(codes)]
+  if (length(codes) == 0) {
+    return(NA_character_)
+  }
+  code <- codes[[1]]
+  if (code %in% names(map)) unname(map[[code]]) else code
+}
+
+# Pure parser: turn a MyVariant hit into an ordered list of predictor readouts.
+myvariant_parse_predictions <- function(hit) {
+  d <- pluck_at(hit, "dbnsfp")
+  revel <- .mv_max_num(pluck_at(d, "revel", "score"))
+  cadd <- .mv_max_num(pluck_at(hit, "cadd", "phred"))
+  entries <- list(
+    list(
+      name = "REVEL",
+      score = revel,
+      call = if (is.na(revel)) {
+        NA_character_
+      } else if (revel >= 0.5) {
+        "damaging-leaning"
+      } else {
+        "benign-leaning"
+      }
+    ),
+    list(
+      name = "AlphaMissense",
+      score = .mv_max_num(pluck_at(d, "alphamissense", "score")),
+      call = .mv_call(
+        pluck_at(d, "alphamissense", "pred"),
+        .mv_pred_maps$alphamissense
+      )
+    ),
+    list(
+      name = "CADD (phred)",
+      score = cadd,
+      call = if (!is.na(cadd) && cadd >= 20) {
+        "top ~1% deleterious"
+      } else {
+        NA_character_
+      }
+    ),
+    list(
+      name = "PolyPhen-2",
+      score = .mv_max_num(pluck_at(d, "polyphen2", "hdiv", "score")),
+      call = .mv_call(
+        pluck_at(d, "polyphen2", "hdiv", "pred"),
+        .mv_pred_maps$polyphen2
+      )
+    ),
+    list(
+      name = "SIFT",
+      score = .mv_max_num(pluck_at(d, "sift", "score")),
+      call = .mv_call(pluck_at(d, "sift", "pred"), .mv_pred_maps$sift)
+    ),
+    list(
+      name = "MetaLR",
+      score = .mv_max_num(pluck_at(d, "metalr", "score")),
+      call = .mv_call(pluck_at(d, "metalr", "pred"), .mv_pred_maps$meta)
+    ),
+    list(
+      name = "MetaSVM",
+      score = .mv_max_num(pluck_at(d, "metasvm", "score")),
+      call = .mv_call(pluck_at(d, "metasvm", "pred"), .mv_pred_maps$meta)
+    )
+  )
+  entries <- Filter(function(e) !is.na(e$score) || !is.na(e$call), entries)
+  if (length(entries) == 0) {
+    return(list(
+      ok = FALSE,
+      error = "No in-silico predictions available for this variant."
+    ))
+  }
+  list(ok = TRUE, predictions = entries)
+}
+
+# Notable variants for a gene: ClinVar pathogenic / likely-pathogenic variants
+# that carry an rsID, used to populate the search box's variant suggestions.
+# Returns:
+#   list(ok = TRUE, variants = data.frame(rsid, label, significance, cadd))
+#   list(ok = FALSE, error = "...")
+myvariant_gene_variants <- function(symbol, size = 200) {
+  if (is_blank(symbol)) {
+    return(list(ok = FALSE, error = "No gene supplied."))
+  }
+  sym <- trimws(as.character(symbol))
+  res <- vr_api_get(
+    MYVARIANT_BASE,
+    path = "query",
+    query = list(
+      q = paste0(
+        "clinvar.gene.symbol:",
+        sym,
+        " AND clinvar.rcv.clinical_significance:",
+        "(\"Pathogenic\" OR \"Likely pathogenic\")",
+        " AND _exists_:dbsnp.rsid"
+      ),
+      size = size,
+      fields = paste(
+        "dbsnp.rsid",
+        "dbnsfp.aa.ref",
+        "dbnsfp.aa.alt",
+        "dbnsfp.aa.pos",
+        "clinvar.rcv.clinical_significance",
+        "cadd.phred",
+        sep = ","
+      )
+    ),
+    source = "MyVariant"
+  )
+  if (!res$ok) {
+    return(list(ok = FALSE, error = res$error))
+  }
+  myvariant_parse_gene_variants(res$data$hits)
+}
+
+# One-letter amino-acid change (e.g. "V600E") from a dbnsfp.aa block, or NA.
+# `pos` arrives as a per-transcript array; the first position is representative.
+.mv_aa_label <- function(aa) {
+  ref <- mygene_first(pluck_at(aa, "ref"))
+  alt <- mygene_first(pluck_at(aa, "alt"))
+  pos <- suppressWarnings(as.integer(unlist(
+    pluck_at(aa, "pos"),
+    use.names = FALSE
+  )))
+  pos <- pos[!is.na(pos)]
+  if (is_blank(ref) || is_blank(alt) || length(pos) == 0) {
+    return(NA_character_)
+  }
+  paste0(ref, pos[[1]], if (identical(alt, "X")) "*" else alt)
+}
+
+# Primary clinical significance (label + severity rank) from the "; "-joined
+# significance string, so suggestions can lead with the most severe call.
+.mv_sig_primary <- function(sig) {
+  terms <- tolower(trimws(strsplit(sig %||% "", ";", fixed = TRUE)[[1]]))
+  if ("pathogenic" %in% terms) {
+    return(list(label = "Pathogenic", rank = 1L))
+  }
+  if ("likely pathogenic" %in% terms) {
+    return(list(label = "Likely pathogenic", rank = 2L))
+  }
+  first <- terms[nzchar(terms)]
+  list(
+    label = if (length(first) == 0) {
+      "ClinVar"
+    } else {
+      tools::toTitleCase(first[[1]])
+    },
+    rank = 3L
+  )
+}
+
+# Pure parser: turn gene-scoped hits into a ranked, de-duplicated variant table
+# (most severe first, then highest CADD). One row per rsID.
+myvariant_parse_gene_variants <- function(hits) {
+  empty <- list(ok = FALSE, error = "No notable variants found for this gene.")
+  if (is.null(hits) || length(hits) == 0) {
+    return(empty)
+  }
+  rows <- lapply(hits, function(h) {
+    rsid <- mygene_first(pluck_at(h, "dbsnp", "rsid"))
+    if (is_blank(rsid)) {
+      return(NULL)
+    }
+    prim <- .mv_sig_primary(myvariant_clinvar_sig(h))
+    data.frame(
+      rsid = tolower(rsid),
+      label = .mv_aa_label(pluck_at(h, "dbnsfp", "aa")),
+      significance = prim$label,
+      rank = prim$rank,
+      cadd = .mv_max_num(pluck_at(h, "cadd", "phred")),
+      stringsAsFactors = FALSE
+    )
+  })
+  rows <- do.call(rbind, rows)
+  if (is.null(rows) || nrow(rows) == 0) {
+    return(empty)
+  }
+  rows <- rows[order(rows$rank, -ifelse(is.na(rows$cadd), -Inf, rows$cadd)), ]
+  rows <- rows[!duplicated(rows$rsid), ]
+  rows$rank <- NULL
+  rownames(rows) <- NULL
+  list(ok = TRUE, variants = rows)
+}
+
+# Named character vector for a selectizeInput: value = rsID, name = display label
+# like "V600E — rs113488022 (Pathogenic)". Falls back to the rsID when there is
+# no amino-acid change (e.g. splice/frameshift variants).
+myvariant_variant_choices <- function(parsed, max_n = 100) {
+  if (is.null(parsed) || !isTRUE(parsed$ok)) {
+    return(character())
+  }
+  v <- parsed$variants
+  if (nrow(v) > max_n) {
+    v <- v[seq_len(max_n), ]
+  }
+  disp <- ifelse(
+    is.na(v$label),
+    sprintf("%s (%s)", v$rsid, v$significance),
+    sprintf("%s — %s (%s)", v$label, v$rsid, v$significance)
+  )
+  stats::setNames(v$rsid, disp)
+}
+
 # clinvar.rcv may be a single object or a list of RCV records; collapse the
 # distinct clinical significance values into one readable string.
 myvariant_clinvar_sig <- function(hit) {

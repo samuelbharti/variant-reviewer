@@ -70,3 +70,63 @@ gnomad_freq_part <- function(x) {
     an = as.numeric(pluck_at(x, "an", default = NA))
   )
 }
+
+# Gene-level constraint: how intolerant the gene is to variation. pLI/LOEUF
+# summarize loss-of-function intolerance; the Z-scores summarize missense and
+# synonymous depletion. Looked up by gene symbol.
+# Returns:
+#   list(ok = TRUE, pli, loeuf, oe_lof, oe_mis, mis_z, syn_z, lof_z)
+#   list(ok = FALSE, error = "...")
+gnomad_gene_constraint <- function(symbol, reference_genome = "GRCh38") {
+  if (is_blank(symbol)) {
+    return(list(ok = FALSE, error = "No gene symbol for constraint lookup."))
+  }
+  query <- sprintf(
+    paste(
+      "query($sym: String!) {",
+      "  gene(gene_symbol: $sym, reference_genome: %s) {",
+      "    gnomad_constraint {",
+      "      pli oe_lof oe_lof_upper mis_z syn_z oe_mis lof_z",
+      "    }",
+      "  }",
+      "}",
+      sep = "\n"
+    ),
+    reference_genome
+  )
+  res <- vr_api_post_json(
+    GNOMAD_URL,
+    body = list(query = query, variables = list(sym = symbol)),
+    source = "gnomAD"
+  )
+  if (!res$ok) {
+    return(list(ok = FALSE, error = res$error))
+  }
+  if (!is.null(res$data$errors)) {
+    return(list(ok = FALSE, error = "gnomAD returned a query error."))
+  }
+  gnomad_parse_constraint(res$data, symbol)
+}
+
+# Pure parser: pull the constraint block out of a gnomAD response. Separated
+# from the fetch so it can be tested against a recorded fixture.
+gnomad_parse_constraint <- function(data, symbol = NA_character_) {
+  con <- pluck_at(data, "data", "gene", "gnomad_constraint")
+  if (is.null(con)) {
+    return(list(
+      ok = FALSE,
+      error = paste0("gnomAD has no constraint data for ", symbol, ".")
+    ))
+  }
+  num <- function(k) as.numeric(pluck_at(con, k, default = NA))
+  list(
+    ok = TRUE,
+    pli = num("pli"),
+    loeuf = num("oe_lof_upper"),
+    oe_lof = num("oe_lof"),
+    oe_mis = num("oe_mis"),
+    mis_z = num("mis_z"),
+    syn_z = num("syn_z"),
+    lof_z = num("lof_z")
+  )
+}
