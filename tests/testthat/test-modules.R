@@ -20,6 +20,41 @@ test_that("gene_search_server treats a blank gene as no query", {
   })
 })
 
+test_that("gene_search_server example click fills inputs but does not submit", {
+  testServer(gene_search_server, {
+    # Clicking the example only populates the inputs; the user still clicks
+    # Review, so no query is emitted yet.
+    session$setInputs(example = 1)
+    expect_null(session$returned())
+  })
+})
+
+test_that("gene_search_server prefetches variant suggestions for the gene", {
+  # Stub the network lookup so the debounced prefetch runs offline.
+  orig <- myvariant_gene_variants
+  myvariant_gene_variants <<- function(symbol, ...) {
+    list(
+      ok = TRUE,
+      variants = data.frame(
+        rsid = "rs1",
+        label = "V600E",
+        significance = "Pathogenic",
+        cadd = 30,
+        stringsAsFactors = FALSE
+      )
+    )
+  }
+  on.exit(myvariant_gene_variants <<- orig, add = TRUE)
+
+  testServer(gene_search_server, {
+    session$setInputs(gene = "BRAF")
+    session$elapse(700) # advance past the 600ms debounce
+    hint <- paste(as.character(output$variant_hint), collapse = " ")
+    expect_match(hint, "known pathogenic")
+    expect_match(hint, "BRAF")
+  })
+})
+
 test_that("gene_search_server returns NULL variant when omitted", {
   testServer(gene_search_server, {
     session$setInputs(gene = "BRCA1", variant = "", submit = 1)

@@ -4,7 +4,8 @@
 ensembl_ui <- function(id) {
   ns <- NS(id)
   card(
-    card_header("Variant consequences (Ensembl VEP)"),
+    full_screen = TRUE,
+    vr_card_header("Variant consequences (Ensembl VEP)", ns),
     card_body(shinycssloaders::withSpinner(
       uiOutput(ns("content")),
       proxy.height = "160px"
@@ -23,6 +24,12 @@ ensembl_server <- function(id, rsid) {
         return(NULL)
       }
       ensembl_vep(id_value)
+    })
+
+    output$source <- renderUI({
+      id_value <- rsid()
+      req(!is_blank(id_value))
+      vr_source_link(src_ensembl_variant(id_value), "Ensembl")
     })
 
     output$table <- reactable::renderReactable({
@@ -72,5 +79,8 @@ ensembl_server <- function(id, rsid) {
         }
       )
     })
+
+    # Returned so the parent can surface this card's data to the assistant.
+    vep
   })
 }

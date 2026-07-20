@@ -4,7 +4,8 @@
 protein_summary_ui <- function(id) {
   ns <- NS(id)
   card(
-    card_header("Protein (ProtVar)"),
+    full_screen = TRUE,
+    vr_card_header("Protein (ProtVar)", ns),
     card_body(shinycssloaders::withSpinner(
       uiOutput(ns("content")),
       proxy.height = "120px"
@@ -42,6 +43,12 @@ protein_summary_server <- function(id, resolved, search, annotation) {
       protvar_annotate(res$uniprot, position)
     })
 
+    output$source <- renderUI({
+      res <- protein()
+      req(!is.null(res), isTRUE(res$ok))
+      vr_source_link(src_uniprot(res$accession), "UniProt")
+    })
+
     output$content <- renderUI({
       res <- protein()
       if (is.null(res)) {
@@ -59,6 +66,9 @@ protein_summary_server <- function(id, resolved, search, annotation) {
         protein_variants_ui(res$variants)
       )
     })
+
+    # Returned so the parent can surface this card's data to the assistant.
+    protein
   })
 }
 

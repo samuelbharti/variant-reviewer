@@ -4,7 +4,8 @@
 gnomad_ui <- function(id) {
   ns <- NS(id)
   card(
-    card_header("Population frequency (gnomAD)"),
+    full_screen = TRUE,
+    vr_card_header("Population frequency (gnomAD)", ns),
     card_body(shinycssloaders::withSpinner(
       uiOutput(ns("content")),
       proxy.height = "120px"
@@ -21,6 +22,12 @@ gnomad_server <- function(id, rsid) {
         return(NULL)
       }
       gnomad_frequency(id_value)
+    })
+
+    output$source <- renderUI({
+      res <- frequency()
+      req(!is.null(res), isTRUE(res$ok))
+      vr_source_link(src_gnomad_variant(res$variant_id, res$dataset), "gnomAD")
     })
 
     output$content <- renderUI({
@@ -53,6 +60,9 @@ gnomad_server <- function(id, rsid) {
         }
       )
     })
+
+    # Returned so the parent can surface this card's data to the assistant.
+    frequency
   })
 }
 

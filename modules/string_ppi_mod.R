@@ -4,7 +4,8 @@
 string_ppi_ui <- function(id) {
   ns <- NS(id)
   card(
-    card_header("Protein interactions (STRING)"),
+    full_screen = TRUE,
+    vr_card_header("Protein interactions (STRING)", ns),
     card_body(shinycssloaders::withSpinner(
       uiOutput(ns("content")),
       proxy.height = "200px"
@@ -23,6 +24,12 @@ string_ppi_server <- function(id, resolved) {
         return(NULL)
       }
       string_interaction_partners(res$symbol)
+    })
+
+    output$source <- renderUI({
+      res <- resolved()
+      req(!is.null(res), isTRUE(res$ok))
+      vr_source_link(src_string(res$symbol), "STRING")
     })
 
     output$table <- reactable::renderReactable({
@@ -63,5 +70,8 @@ string_ppi_server <- function(id, resolved) {
       }
       reactable::reactableOutput(ns("table"))
     })
+
+    # Returned so the parent can surface this card's data to the assistant.
+    partners
   })
 }
