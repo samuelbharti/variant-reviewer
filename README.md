@@ -7,20 +7,42 @@ and protein-level context for the variant.
 
 The app is a thin, reactive front end over several public bioinformatics APIs:
 
-| Card / section            | Source   |
-| ------------------------- | -------- |
-| Gene summary              | MyGene   |
-| Variant annotation        | MyVariant |
-| Protein context           | ProtVar (EBI) |
-| Clinical significance     | ClinVar (NCBI E-utilities) |
-| Population frequency       | gnomAD   |
-| Variant consequences      | Ensembl VEP |
-| Tissue expression         | GTEx     |
-| Protein interactions      | STRING   |
-| Disease associations      | Open Targets |
-| External resource links   | derived  |
+| Card / section          | Source                            |
+| ----------------------- | --------------------------------- |
+| Gene summary            | MyGene                            |
+| Variant annotation      | MyVariant                         |
+| In-silico predictions   | dbNSFP (MyVariant)                |
+| Protein context         | ProtVar (EBI)                     |
+| Variant landscape       | ClinVar variants (gnomAD) + UniProt domains |
+| Conservation            | dbNSFP (MyVariant)                |
+| Ancestry frequency      | gnomAD                            |
+| Protein domains         | UniProt (EBI Proteins)            |
+| 3D structure            | AlphaFold DB                      |
+| Clinical significance   | ClinVar (NCBI E-utilities)        |
+| Population frequency    | gnomAD                            |
+| Gene constraint         | gnomAD                            |
+| Gene model              | Ensembl                           |
+| Variant consequences    | Ensembl VEP                       |
+| Tissue expression       | GTEx                              |
+| Protein interactions    | STRING                            |
+| Disease associations    | Open Targets                      |
+| External resource links | derived                           |
+| AI assistant (chat)     | BYOK: Gemini / OpenAI / Anthropic |
 
-All sources are public and require no API key.
+All data sources are public and require no API key. The optional AI assistant is
+"bring your own key" — see [AI assistant](#ai-assistant) below.
+
+## Scope
+
+**The app** reviews one human gene and, optionally, one variant at a time,
+aggregating public annotations read-only onto a single dashboard and linking out
+to the primary sources. It is **not** for batch/VCF-scale analysis or variant
+calling, non-human species, or clinical diagnosis, treatment, or
+genetic-counseling advice.
+
+**The assistant** helps interpret the gene or variant on screen and answers
+general genomics questions within that scope; it declines unrelated requests and
+is not a source of medical, diagnostic, or treatment advice.
 
 ## Requirements
 
@@ -41,8 +63,17 @@ Or install the core packages manually:
 ```r
 install.packages(c(
   "shiny", "bslib", "brand.yml", "ggplot2",
-  "httr2", "reactable", "jsonlite", "shinycssloaders"
+  "httr2", "reactable", "jsonlite", "shinycssloaders",
+  "r3dmol", # 3D structure card (AlphaFold viewer)
+  # AI assistant (optional; the app degrades gracefully without them)
+  "ellmer", "shinychat"
 ))
+
+# biobouncer (input validation) is published on r-universe, not CRAN:
+install.packages(
+  "biobouncer",
+  repos = c("https://samuelbharti.r-universe.dev", getOption("repos"))
+)
 ```
 
 ## How to run
@@ -68,7 +99,7 @@ Then open [http://localhost:3838](http://localhost:3838).
 .
 ├── _brand.yml              # Brand colors, fonts, logo (theming)
 ├── global.R                # Libraries and component loading
-├── ui.R                    # Single-page dashboard layout
+├── ui.R                    # Navbar layout: Home dashboard + About page
 ├── server.R                # Wires search -> resolved gene -> result modules
 ├── R/                      # Pure-R API clients + helpers (no Shiny)
 │   ├── api_http.R          # Shared httr2 GET wrapper (timeouts, retries, errors)
@@ -79,14 +110,22 @@ Then open [http://localhost:3838](http://localhost:3838).
 │   ├── api_string.R        # Interaction partners
 │   └── ui_helpers.R        # Small presentation helpers
 ├── modules/                # Shiny modules (one card each)
-├── userInterface/          # Page-level layout (dashboard_ui.R)
+├── userInterface/          # Page-level layout (dashboard_ui.R, about_ui.R)
 ├── tests/                  # testthat unit/reactive tests + shinytest2 e2e
 └── docs/                   # Project documentation, including docs/plans/
 ```
 
 ### Architecture
 
-The search module emits a reactive query `{gene, variant}`. `server.R` resolves
+The search module emits a reactive query `{gene, variant}`. As the gene field
+settles, the variant box prefetches that gene's known pathogenic/likely-
+pathogenic variants (ClinVar via MyVariant) as typeahead suggestions, while
+still accepting any free-typed rsID/HGVS. Before any API is
+queried, the gene and variant are validated with
+[biobouncer](https://github.com/samuelbharti/biobouncer)'s offline `pattern`
+mode (gene against the HGNC grammar, rsIDs against dbSNP), so malformed input is
+rejected up front with an inline message rather than firing failing lookups —
+the same gate covers the assistant's `set_selection`. `server.R` resolves
 the gene **once** via MyGene (symbol → Ensembl / Entrez / UniProt) and shares
 that with every gene-level module, so each API is queried only when needed. API
 clients are pure R (in `R/`, individually testable); modules only orchestrate
@@ -108,6 +147,31 @@ shiny::runTests(".")
 - **End-to-end** (`test-shinytest2.R`) launches the app in a headless browser;
   the live-API search test is skipped on CI for determinism (run locally with
   `NOT_CRAN=true`).
+
+## AI assistant
+
+The dashboard includes an optional chat assistant ([modules/byok_chat_mod.R](modules/byok_chat_mod.R))
+for discussing the gene or variant you're reviewing. It is **bring your own key
+(BYOK)**: open the chat's **Model & key** drawer (the gear button in the chat
+header), pick a provider (Google Gemini, OpenAI, or Anthropic), and paste your
+own API key, which is held only in your session's server memory and never
+written to disk. Alternatively, set a server-side key via the
+matching environment variable (`GEMINI_API_KEY` / `GOOGLE_API_KEY`,
+`OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`) and connect with the key field blank.
+
+The assistant is grounded in the dashboard through app-scoped tools (wired in
+[server.R](server.R), formatters in [R/chat_tools.R](R/chat_tools.R)):
+
+- `get_current_selection` — the gene/variant currently loaded.
+- `read_card` — the data shown in a specific card (gene, variant, predictions,
+  protein, domains, structure, clinvar, gnomad, constraint, consequences,
+  expression, interactions, diseases).
+- `set_selection` — load a gene (and optional variant) into the dashboard,
+  running the app's own lookups.
+
+It works through the app's data and lookups rather than searching externally. It
+requires the `ellmer` and `shinychat` packages; if they are absent the card
+renders a short setup panel and the rest of the app loads normally.
 
 ## Theming
 

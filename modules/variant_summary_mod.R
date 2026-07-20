@@ -4,7 +4,8 @@
 variant_summary_ui <- function(id) {
   ns <- NS(id)
   card(
-    card_header("Variant"),
+    full_screen = TRUE,
+    vr_card_header("Variant", ns),
     card_body(shinycssloaders::withSpinner(
       uiOutput(ns("content")),
       proxy.height = "120px"
@@ -16,6 +17,12 @@ variant_summary_ui <- function(id) {
 # no variant was supplied.
 variant_summary_server <- function(id, annotation) {
   moduleServer(id, function(input, output, session) {
+    output$source <- renderUI({
+      res <- annotation()
+      req(!is.null(res), isTRUE(res$ok))
+      vr_source_link(src_dbsnp(res$rsid), "dbSNP")
+    })
+
     output$content <- renderUI({
       res <- annotation()
       if (is.null(res)) {

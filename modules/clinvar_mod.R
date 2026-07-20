@@ -4,7 +4,8 @@
 clinvar_ui <- function(id) {
   ns <- NS(id)
   card(
-    card_header("Clinical significance (ClinVar)"),
+    full_screen = TRUE,
+    vr_card_header("Clinical significance (ClinVar)", ns),
     card_body(shinycssloaders::withSpinner(
       uiOutput(ns("content")),
       proxy.height = "120px"
@@ -21,6 +22,12 @@ clinvar_server <- function(id, rsid) {
         return(NULL)
       }
       clinvar_classification(id_value)
+    })
+
+    output$source <- renderUI({
+      res <- classification()
+      req(!is.null(res), isTRUE(res$ok))
+      vr_source_link(src_clinvar_variation(res$uid), "ClinVar")
     })
 
     output$content <- renderUI({
@@ -60,5 +67,8 @@ clinvar_server <- function(id, rsid) {
         tags$p(class = "mb-0", tags$strong("Accession: "), link)
       )
     })
+
+    # Returned so the parent can surface this card's data to the assistant.
+    classification
   })
 }

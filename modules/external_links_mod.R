@@ -4,6 +4,7 @@
 external_links_ui <- function(id) {
   ns <- NS(id)
   card(
+    full_screen = TRUE,
     card_header("External resources"),
     card_body(shinycssloaders::withSpinner(
       uiOutput(ns("content")),
@@ -28,11 +29,12 @@ external_links_server <- function(id, resolved) {
         class = "d-flex flex-wrap gap-2",
         lapply(names(links), function(label) {
           tags$a(
-            class = "btn btn-outline-primary btn-sm",
+            class = "btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2",
             href = links[[label]],
             target = "_blank",
             rel = "noopener noreferrer",
-            label
+            label,
+            icon("up-right-from-square")
           )
         })
       )

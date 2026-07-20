@@ -1,0 +1,247 @@
+{
+    "took": 6,
+    "total": 134,
+    "max_score": 16.278595,
+    "hits": [
+        {
+            "_id": "chr7:g.140477854A>G",
+            "_score": 16.278595,
+            "cadd": {
+                "_license": "http://bit.ly/2TIuab9",
+                "phred": 29.2
+            },
+            "clinvar": {
+                "_license": "http://bit.ly/2SQdcI0",
+                "rcv": [
+                    {
+                        "clinical_significance": "Pathogenic/Likely pathogenic"
+                    },
+                    {
+                        "clinical_significance": "Likely pathogenic"
+                    },
+                    {
+                        "clinical_significance": "Likely pathogenic"
+                    },
+                    {
+                        "clinical_significance": "Likely pathogenic"
+                    },
+                    {
+                        "clinical_significance": "Likely pathogenic"
+                    }
+                ]
+            },
+            "dbnsfp": {
+                "_license": "http://bit.ly/2VLnQBz",
+                "aa": {
+                    "alt": "S",
+                    "pos": [
+                        485,
+                        525,
+                        485,
+                        525
+                    ],
+                    "ref": "L"
+                }
+            },
+            "dbsnp": {
+                "_license": "http://bit.ly/2AqoLOc",
+                "rsid": "rs397507475"
+            }
+        },
+        {
+            "_id": "chr7:g.140501279C>G",
+            "_score": 15.892951,
+            "cadd": {
+                "_license": "http://bit.ly/2TIuab9",
+                "phred": 31
+            },
+            "clinvar": {
+                "_license": "http://bit.ly/2SQdcI0",
+                "rcv": [
+                    {
+                        "clinical_significance": "Likely pathogenic"
+                    },
+                    {
+                        "clinical_significance": "Likely pathogenic"
+                    }
+                ]
+            },
+            "dbnsfp": {
+                "_license": "http://bit.ly/2VLnQBz",
+                "aa": {
+                    "alt": "R",
+                    "pos": [
+                        265,
+                        265,
+                        265,
+                        265
+                    ],
+                    "ref": "G"
+                }
+            },
+            "dbsnp": {
+                "_license": "http://bit.ly/2AqoLOc",
+                "rsid": "rs397516905"
+            }
+        },
+        {
+            "_id": "chr7:g.140501332A>G",
+            "_score": 15.732143,
+            "cadd": {
+                "_license": "http://bit.ly/2TIuab9",
+                "phred": 29.4
+            },
+            "clinvar": {
+                "_license": "http://bit.ly/2SQdcI0",
+                "rcv": [
+                    {
+                        "clinical_significance": "Likely pathogenic"
+                    },
+                    {
+                        "clinical_significance": "Pathogenic"
+                    },
+                    {
+                        "clinical_significance": "Likely pathogenic"
+                    }
+                ]
+            },
+            "dbnsfp": {
+                "_license": "http://bit.ly/2VLnQBz",
+                "aa": {
+                    "alt": "S",
+                    "pos": [
+                        247,
+                        247,
+                        247,
+                        247
+                    ],
+                    "ref": "F"
+                }
+            },
+            "dbsnp": {
+                "_license": "http://bit.ly/2AqoLOc",
+                "rsid": "rs397507467"
+            }
+        },
+        {
+            "_id": "chr7:g.140453133T>A",
+            "_score": 15.648572,
+            "cadd": {
+                "_license": "http://bit.ly/2TIuab9",
+                "phred": 33
+            },
+            "clinvar": {
+                "_license": "http://bit.ly/2SQdcI0",
+                "rcv": [
+                    {
+                        "clinical_significance": "Pathogenic"
+                    },
+                    {
+                        "clinical_significance": "Likely pathogenic"
+                    },
+                    {
+                        "clinical_significance": "Pathogenic"
+                    },
+                    {
+                        "clinical_significance": "Likely pathogenic"
+                    },
+                    {
+                        "clinical_significance": "Likely pathogenic"
+                    }
+                ]
+            },
+            "dbnsfp": {
+                "_license": "http://bit.ly/2VLnQBz",
+                "aa": {
+                    "alt": "I",
+                    "pos": [
+                        601,
+                        641,
+                        601,
+                        641
+                    ],
+                    "ref": "K"
+                }
+            },
+            "dbsnp": {
+                "_license": "http://bit.ly/2AqoLOc",
+                "rsid": "rs397507484"
+            }
+        },
+        {
+            "_id": "chr7:g.140481417C>G",
+            "_score": 15.642988,
+            "cadd": {
+                "_license": "http://bit.ly/2TIuab9",
+                "phred": 28.0
+            },
+            "clinvar": {
+                "_license": "http://bit.ly/2SQdcI0",
+                "rcv": [
+                    {
+                        "clinical_significance": "Likely pathogenic"
+                    },
+                    {
+                        "clinical_significance": "Likely pathogenic"
+                    }
+                ]
+            },
+            "dbnsfp": {
+                "_license": "http://bit.ly/2VLnQBz",
+                "aa": {
+                    "alt": "A",
+                    "pos": [
+                        464,
+                        504,
+                        464,
+                        504
+                    ],
+                    "ref": "G"
+                }
+            },
+            "dbsnp": {
+                "_license": "http://bit.ly/2AqoLOc",
+                "rsid": "rs121913348"
+            }
+        },
+        {
+            "_id": "chr7:g.140501287T>C",
+            "_score": 15.547416,
+            "cadd": {
+                "_license": "http://bit.ly/2TIuab9",
+                "phred": 23.3
+            },
+            "clinvar": {
+                "_license": "http://bit.ly/2SQdcI0",
+                "rcv": [
+                    {
+                        "clinical_significance": "Pathogenic"
+                    },
+                    {
+                        "clinical_significance": "Likely pathogenic"
+                    },
+                    {
+                        "clinical_significance": "Likely pathogenic"
+                    }
+                ]
+            },
+            "dbnsfp": {
+                "_license": "http://bit.ly/2VLnQBz",
+                "aa": {
+                    "alt": "R",
+                    "pos": [
+                        262,
+                        262,
+                        262,
+                        262
+                    ],
+                    "ref": "Q"
+                }
+            },
+            "dbsnp": {
+                "_license": "http://bit.ly/2AqoLOc",
+                "rsid": "rs397516904"
+            }
+        }
+    ]
+}

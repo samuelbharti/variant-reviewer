@@ -4,7 +4,8 @@
 opentargets_ui <- function(id) {
   ns <- NS(id)
   card(
-    card_header("Disease associations (Open Targets)"),
+    full_screen = TRUE,
+    vr_card_header("Disease associations (Open Targets)", ns),
     card_body(shinycssloaders::withSpinner(
       uiOutput(ns("content")),
       proxy.height = "200px"
@@ -23,6 +24,12 @@ opentargets_server <- function(id, resolved) {
         return(NULL)
       }
       opentargets_diseases(res$ensembl_gene)
+    })
+
+    output$source <- renderUI({
+      res <- resolved()
+      req(!is.null(res), isTRUE(res$ok))
+      vr_source_link(src_opentargets_gene(res$ensembl_gene), "Open Targets")
     })
 
     output$table <- reactable::renderReactable({
@@ -89,5 +96,8 @@ opentargets_server <- function(id, resolved) {
         }
       )
     })
+
+    # Returned so the parent can surface this card's data to the assistant.
+    diseases
   })
 }

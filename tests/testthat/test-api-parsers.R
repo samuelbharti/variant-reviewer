@@ -195,3 +195,302 @@ test_that("external_links_build() only includes links with ids present", {
   expect_true("GeneCards" %in% names(partial))
   expect_false("Ensembl" %in% names(partial)) # no ensembl id -> no link
 })
+
+test_that("gnomad_parse_constraint() extracts constraint metrics", {
+  data <- read_fixture("gnomad_constraint_braf.json")
+  res <- gnomad_parse_constraint(data, "BRAF")
+  expect_true(res$ok)
+  expect_gt(res$pli, 0.99)
+  expect_equal(round(res$loeuf, 2), 0.23)
+  expect_gt(res$mis_z, 5)
+})
+
+test_that("gnomad_parse_constraint() reports missing data", {
+  res <- gnomad_parse_constraint(list(data = list(gene = NULL)), "XYZ")
+  expect_false(res$ok)
+  expect_match(res$error, "no constraint")
+})
+
+test_that("myvariant_parse_predictions() summarizes in-silico scores", {
+  hit <- read_fixture("myvariant_predictions_braf.json")$hits[[1]]
+  res <- myvariant_parse_predictions(hit)
+  expect_true(res$ok)
+  by_name <- function(nm) {
+    Filter(function(p) p$name == nm, res$predictions)[[1]]
+  }
+  expect_equal(by_name("REVEL")$score, 0.672)
+  expect_match(by_name("REVEL")$call, "damaging")
+  # AlphaMissense score is a per-transcript array; the parser keeps the max.
+  expect_equal(by_name("AlphaMissense")$score, 0.9878)
+  expect_match(by_name("AlphaMissense")$call, "pathogenic")
+})
+
+test_that("myvariant_predictions() rejects non-queryable input", {
+  res <- myvariant_predictions("R175H")
+  expect_false(res$ok)
+  expect_match(res$error, "rsID")
+})
+
+test_that("myvariant_parse_gene_variants() builds a ranked variant table", {
+  hits <- read_fixture("myvariant_gene_variants_braf.json")$hits
+  res <- myvariant_parse_gene_variants(hits)
+  expect_true(res$ok)
+  v <- res$variants
+  expect_true(all(c("rsid", "label", "significance", "cadd") %in% names(v)))
+  # rsIDs are lower-cased and unique.
+  expect_true(all(grepl("^rs[0-9]+$", v$rsid)))
+  expect_equal(anyDuplicated(v$rsid), 0L)
+  # Amino-acid labels take the one-letter ref+pos+alt form (e.g. L485S).
+  expect_true(any(grepl("^[A-Z][0-9]+[A-Z*]$", v$label)))
+  # Every suggestion is pathogenic/likely-pathogenic, most severe ranked first.
+  expect_true(all(v$significance %in% c("Pathogenic", "Likely pathogenic")))
+  expect_false(is.unsorted(match(
+    v$significance,
+    c("Pathogenic", "Likely pathogenic")
+  )))
+})
+
+test_that("myvariant_parse_gene_variants() drops rsID-less hits and de-dupes", {
+  hits <- list(
+    list(
+      dbsnp = list(rsid = "rs1"),
+      dbnsfp = list(
+        aa = list(
+          ref = "V",
+          alt = "E",
+          pos = list(600)
+        )
+      ),
+      clinvar = list(rcv = list(clinical_significance = "Pathogenic"))
+    ),
+    # duplicate rsID (kept once), and a hit with no rsID (dropped).
+    list(
+      dbsnp = list(rsid = "RS1"),
+      clinvar = list(
+        rcv = list(
+          clinical_significance = "Likely pathogenic"
+        )
+      )
+    ),
+    list(dbnsfp = list(aa = list(ref = "A", alt = "T", pos = list(1))))
+  )
+  res <- myvariant_parse_gene_variants(hits)
+  expect_true(res$ok)
+  expect_equal(nrow(res$variants), 1L)
+  expect_equal(res$variants$rsid, "rs1")
+  expect_equal(res$variants$label, "V600E")
+})
+
+test_that("myvariant_variant_choices() maps display labels to rsIDs", {
+  parsed <- myvariant_parse_gene_variants(
+    read_fixture("myvariant_gene_variants_braf.json")$hits
+  )
+  choices <- myvariant_variant_choices(parsed, max_n = 3)
+  expect_length(choices, 3)
+  expect_true(all(grepl("^rs[0-9]+$", unname(choices))))
+  expect_match(names(choices)[1], "\\(")
+  # No suggestions for a failed parse.
+  expect_length(myvariant_variant_choices(list(ok = FALSE)), 0)
+})
+
+test_that("proteins_parse_features() tidies features and finds those at a residue", {
+  data <- read_fixture("proteins_features_p15056.json")
+  res <- proteins_parse_features(data, "P15056")
+  expect_true(res$ok)
+  expect_gt(nrow(res$features), 0)
+  expect_true(all(
+    c("type", "label", "description", "begin", "end") %in% names(res$features)
+  ))
+  # BRAF V600 sits inside the protein kinase domain (457-717).
+  at <- proteins_features_at(res$features, 600)
+  expect_true(any(at$description == "Protein kinase"))
+  # ...and a position past the last annotated feature matches nothing.
+  expect_equal(nrow(proteins_features_at(res$features, 5000)), 0)
+})
+
+test_that("proteins_features() rejects a missing accession", {
+  res <- proteins_features("")
+  expect_false(res$ok)
+  expect_match(res$error, "accession")
+})
+
+test_that("alphafold_parse_model() extracts the model URL", {
+  data <- read_fixture("alphafold_p15056.json")
+  res <- alphafold_parse_model(data, "P15056")
+  expect_true(res$ok)
+  expect_match(res$pdb_url, "^https://.*AF-P15056.*\\.pdb$")
+})
+
+test_that("alphafold_parse_model() reports a missing model", {
+  res <- alphafold_parse_model(list(), "XYZ")
+  expect_false(res$ok)
+  expect_match(res$error, "No AlphaFold model")
+})
+
+test_that("vr_http_error_message hides technical detail behind plain language", {
+  # Transport errors (timeout/DNS/connection) never leak curl internals.
+  timeout <- simpleError(
+    "Failed to perform HTTP request. Timeout was reached [rest.ensembl.org]"
+  )
+  msg <- vr_http_error_message("Ensembl VEP", condition = timeout)
+  expect_match(msg, "took too long", fixed = TRUE)
+  expect_no_match(msg, "curl|Timeout was reached|http request")
+
+  dns <- simpleError("Could not resolve host: mygene.info")
+  expect_match(
+    vr_http_error_message("MyGene", condition = dns),
+    "check your internet connection"
+  )
+
+  # HTTP statuses map to their own short messages.
+  expect_match(
+    vr_http_error_message("ClinVar", status = 404L),
+    "No ClinVar data"
+  )
+  expect_match(vr_http_error_message("gnomAD", status = 429L), "busy right now")
+  expect_match(
+    vr_http_error_message("STRING", status = 503L),
+    "temporarily unavailable"
+  )
+
+  # An unclassified transport error still degrades to a safe generic message.
+  expect_match(
+    vr_http_error_message("GTEx", condition = simpleError("weird boom")),
+    "temporarily unavailable"
+  )
+})
+
+test_that("gnomad_parse_populations sums exome+genome and drops sex splits", {
+  exome <- list(
+    list(id = "nfe", ac = 10, an = 1000),
+    list(id = "afr", ac = 1, an = 500),
+    list(id = "nfe_XX", ac = 5, an = 500), # sex split -> dropped
+    list(id = "XY", ac = 9, an = 900) # overall sex group -> dropped
+  )
+  genome <- list(
+    list(id = "nfe", ac = 2, an = 200),
+    list(id = "eas", ac = 0, an = 300)
+  )
+  df <- gnomad_parse_populations(exome, genome)
+  # Only real ancestry groups survive (no XX/XY, no …_XX/…_XY, no sub-pops).
+  expect_setequal(df$pop, c("nfe", "afr", "eas"))
+  expect_equal(df$ac[df$pop == "nfe"], 12) # summed across sample sets
+  expect_equal(df$an[df$pop == "nfe"], 1200)
+  expect_equal(df$label[df$pop == "nfe"], "European (non-Finnish)")
+  expect_equal(df$af[df$pop == "afr"], 1 / 500)
+  expect_equal(df$af, sort(df$af, decreasing = TRUE)) # sorted by frequency
+  expect_null(gnomad_parse_populations(list(), list()))
+})
+
+test_that("gnomad_sig_category and gnomad_hgvsp_residue classify inputs", {
+  expect_equal(gnomad_sig_category("Pathogenic"), "Pathogenic / likely")
+  expect_equal(gnomad_sig_category("Likely pathogenic"), "Pathogenic / likely")
+  expect_equal(gnomad_sig_category("Likely benign"), "Benign / likely")
+  expect_equal(gnomad_sig_category("Uncertain significance"), "Uncertain")
+  expect_equal(
+    gnomad_sig_category("Conflicting interpretations of pathogenicity"),
+    "Conflicting"
+  )
+  expect_equal(gnomad_hgvsp_residue("p.Val600Glu"), 600L)
+  expect_equal(gnomad_hgvsp_residue("p.V600E"), 600L)
+  expect_true(is.na(gnomad_hgvsp_residue(NULL)))
+  expect_true(is.na(gnomad_hgvsp_residue("p.=")))
+})
+
+test_that("gnomad_parse_clinvar_variants keeps only residue-bearing variants", {
+  records <- list(
+    list(
+      pos = 140753336,
+      hgvsp = "p.Val600Glu",
+      major_consequence = "missense_variant",
+      clinical_significance = "Pathogenic"
+    ),
+    list(
+      pos = 1,
+      hgvsp = NULL, # UTR variant, no residue -> dropped
+      major_consequence = "3_prime_UTR_variant",
+      clinical_significance = "Benign"
+    )
+  )
+  res <- gnomad_parse_clinvar_variants(records, "BRAF")
+  expect_true(res$ok)
+  expect_equal(nrow(res$variants), 1)
+  expect_equal(res$variants$residue, 600L)
+  expect_equal(res$variants$category, "Pathogenic / likely")
+
+  expect_false(gnomad_parse_clinvar_variants(list(), "BRAF")$ok)
+})
+
+test_that("myvariant_parse_conservation extracts the four metrics", {
+  hit <- list(
+    dbnsfp = list(
+      phylop = list(
+        `100way_vertebrate` = list(score = 9.236, rankscore = 0.944)
+      ),
+      phastcons = list(
+        `100way_vertebrate` = list(score = 1.0, rankscore = 0.716)
+      ),
+      `gerp++` = list(rs = 5.65, rs_rankscore = 0.868),
+      siphy_29way = list(logodds_score = 15.93, logodds_rankscore = 0.794)
+    )
+  )
+  res <- myvariant_parse_conservation(hit)
+  expect_true(res$ok)
+  expect_equal(nrow(res$metrics), 4)
+  expect_equal(res$metrics$score[res$metrics$metric == "GERP++ RS"], 5.65)
+  expect_true(all(res$metrics$rankscore >= 0 & res$metrics$rankscore <= 1))
+
+  expect_false(myvariant_parse_conservation(list(dbnsfp = list()))$ok)
+})
+
+test_that("ensembl_parse_gene_model picks the canonical transcript's exons", {
+  record <- list(
+    seq_region_name = "7",
+    start = 100,
+    end = 400,
+    Transcript = list(
+      list(
+        id = "ENST_OTHER",
+        is_canonical = 0,
+        strand = -1,
+        Exon = list(
+          list(start = 100, end = 150)
+        )
+      ),
+      list(
+        id = "ENST_CANON",
+        is_canonical = 1,
+        strand = -1,
+        Exon = list(
+          list(start = 300, end = 400),
+          list(start = 100, end = 200)
+        )
+      )
+    )
+  )
+  res <- ensembl_parse_gene_model(record)
+  expect_true(res$ok)
+  expect_equal(res$transcript, "ENST_CANON")
+  expect_equal(nrow(res$exons), 2)
+  expect_equal(res$exons$start, c(100, 300)) # rows sorted by genomic start
+  # Minus strand: numbered 5'->3', so the highest-coordinate exon is exon 1.
+  expect_equal(res$exons$number, c(2L, 1L))
+  expect_equal(res$strand, -1)
+
+  # Plus strand numbers in genomic order instead.
+  plus <- ensembl_parse_gene_model(list(
+    seq_region_name = "1",
+    Transcript = list(list(
+      id = "T",
+      is_canonical = 1,
+      strand = 1,
+      Exon = list(
+        list(start = 100, end = 200),
+        list(start = 300, end = 400)
+      )
+    ))
+  ))
+  expect_equal(plus$exons$number, c(1L, 2L))
+
+  expect_false(ensembl_parse_gene_model(list(Transcript = list()))$ok)
+})
