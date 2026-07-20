@@ -4,6 +4,14 @@
 # Null-coalescing operator (base R has this from 4.4.0; defined for older R).
 `%||%` <- function(x, y) if (is.null(x)) y else x # nolint: object_name_linter.
 
+# App palette (organic, mirrors the color palette in _brand.yml). Used where a
+# color must be set in R — e.g. ggplot geoms — rather than via the CSS theme.
+vr_colors <- list(
+  primary = "#4c7a5b", # sage/forest green
+  accent = "#c07a52", # warm clay
+  stone = "#7a7468" # muted stone/taupe
+)
+
 # A "Label: value" row. Hides the row entirely when the value is blank.
 vr_field <- function(label, value) {
   if (is_blank(value)) {
