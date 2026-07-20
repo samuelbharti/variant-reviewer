@@ -6,13 +6,20 @@ meta:
   name: Variant Reviewer
 
 color:
+  # Organic palette: muted, earthy tones for a simple, clean look. `green`
+  # drives buttons/links/accents; `clay` is a warm accent for a second series;
+  # neutrals are warm (paper background, warm-charcoal text) rather than pure
+  # black/white. Keep in sync with `vr_colors` in R/ui_helpers.R (used for plots).
   palette:
-    blue: "#0066cc"
-    gray: "#5b6770"
-  primary: blue
-  secondary: gray
-  foreground: "#1a1a1a"
-  background: "#ffffff"
+    green: "#4c7a5b"
+    clay: "#c07a52"
+    stone: "#7a7468"
+    charcoal: "#2c2a25"
+    paper: "#faf8f3"
+  primary: green
+  secondary: stone
+  foreground: charcoal
+  background: paper
 
 typography:
   fonts:

@@ -1,0 +1,30 @@
+/* Home page: the results column (left) scrolls with the page while the chat
+   column (right) stays pinned in view.
+
+   layout_columns() renders a CSS grid whose items stretch to the row height by
+   default; align-self:start lets the chat take its own height so it can stick
+   within the (taller) results track instead of being stretched to match it. */
+.vr-chat-col {
+  position: sticky;
+  top: 1rem;
+  align-self: start;
+}
+
+/* Chat "Model & key" drawer: make every control fill the drawer width so the
+   selects/inputs aren't narrower than the panel. */
+.offcanvas-body .shiny-input-container,
+.offcanvas-body .form-group,
+.offcanvas-body .selectize-control {
+  width: 100% !important;
+}
+
+/* Tint card headers with a soft wash of the brand primary so they stand out
+   from the card body while staying on-theme. color-mix keeps it derived from
+   the theme; the hex above it is a fallback for older browsers. */
+.card-header {
+  font-weight: 600;
+  background-color: #edf2ec;
+  background-color: color-mix(in srgb, var(--bs-primary) 9%, white);
+  border-bottom-color: #dbe4d9;
+  border-bottom-color: color-mix(in srgb, var(--bs-primary) 22%, var(--bs-border-color));
+}
