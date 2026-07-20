@@ -107,6 +107,17 @@ function(input, output, session) {
   string_data <- string_ppi_server("string_ppi", resolved)
   opentargets_data <- opentargets_server("opentargets", resolved)
   external_links_server("links", resolved)
+  # Visualization cards. The ancestry card reuses the shared gnomAD result (no
+  # extra fetch); the gene model reuses the VEP result for the variant position.
+  landscape_data <- variant_landscape_server(
+    "landscape",
+    resolved,
+    search,
+    variant_annotation
+  )
+  conservation_data <- conservation_server("conservation", variant_rsid)
+  genemodel_data <- gene_model_server("genemodel", resolved, gnomad_data)
+  gnomad_ancestry_server("gnomad_ancestry", gnomad_data)
 
   # --- AI assistant ---------------------------------------------------------
   # Mirror each card's current data into a plain (non-reactive) store so the
@@ -145,6 +156,9 @@ function(input, output, session) {
   observe(dash$expression <- gtex_data())
   observe(dash$interactions <- string_data())
   observe(dash$diseases <- opentargets_data())
+  observe(dash$landscape <- landscape_data())
+  observe(dash$conservation <- conservation_data())
+  observe(dash$genemodel <- genemodel_data())
 
   # Load a gene/variant into the dashboard on the assistant's behalf: update the
   # (namespaced) search inputs and set the shared query, which drives the whole
@@ -188,58 +202,39 @@ function(input, output, session) {
     )
   }
 
-  # Demo button (navbar): load a worked example so every card populates, then
-  # open a short guide covering the dashboard and how to use the assistant.
+  # Demo button (navbar): a guided walkthrough. Fill the search inputs with a
+  # worked example, "click" Review a beat later so the fill is visible before the
+  # cards load, then start the cicerone tour that steps through each card and
+  # ends on the assistant. Every card must be shown for its tour anchor to
+  # exist, so re-tick them all first. Falls back to a modal when cicerone is
+  # absent. The staged timing runs off later::later (the reactiveVal set and the
+  # tour start need no reactive context; they just push onto the event loop).
+  demo_guide <- vr_demo_tour()
   observeEvent(input$demo, {
-    load_selection(.gene_search_example$gene, .gene_search_example$variant)
-    showModal(modalDialog(
-      title = paste0("Demo: ", .gene_search_example$label),
-      easyClose = TRUE,
-      size = "l",
-      footer = modalButton("Got it"),
-      tags$p(
-        "Loaded ",
-        tags$strong(.gene_search_example$label),
-        " into the dashboard. Each card is now populated for this gene and",
-        " variant — scroll the results to explore:"
-      ),
-      tags$ul(
-        tags$li(
-          tags$strong("Gene / Variant / Protein"),
-          " — identity, annotation, and protein context."
-        ),
-        tags$li(
-          tags$strong("ClinVar / gnomAD / Consequences"),
-          " — clinical significance, population frequency, and predicted effect."
-        ),
-        tags$li(
-          tags$strong("Expression / Interactions / Diseases"),
-          " — GTEx tissue expression, STRING partners, and Open Targets associations."
-        )
-      ),
-      tags$p(
-        "Each card links out to its source, and the expand icon opens a card",
-        " full-screen."
-      ),
-      tags$hr(),
-      tags$p(tags$strong("Using the AI assistant")),
-      tags$ol(
-        tags$li(
-          "Open ",
-          tags$strong("Model & key"),
-          " (top-right of the chat panel)."
-        ),
-        tags$li(
-          "Connect a provider — a key set in the environment is used",
-          " automatically, otherwise paste your own (kept only in this session)."
-        ),
-        tags$li(
-          "Ask about the loaded gene/variant, or click one of the example",
-          " prompts. The assistant can read the cards and load new",
-          " genes/variants for you."
-        )
-      )
-    ))
+    ex <- .gene_search_example
+    updateCheckboxGroupInput(
+      session,
+      "visible_cards",
+      selected = names(.dashboard_cards)
+    )
+    updateTextInput(session, "search-gene", value = ex$gene)
+    updateSelectizeInput(
+      session,
+      "search-variant",
+      choices = stats::setNames(ex$variant, ex$variant),
+      selected = ex$variant,
+      server = FALSE
+    )
+    # Fill the search inputs but do NOT submit: the walkthrough asks the user to
+    # click Review themselves. Its first step highlights the search box, and
+    # driver.js keeps the highlighted element interactive, so Review is clickable
+    # from within the tour; the cards then load on the user's own click and
+    # populate as they step through. (search() is deliberately not called here.)
+    if (is.null(demo_guide)) {
+      showModal(vr_demo_modal(ex$label))
+    } else {
+      demo_guide$init(session)$start(session = session)
+    }
   })
 
   # Assistant tools, scoped to this app: read the loaded selection, read any
