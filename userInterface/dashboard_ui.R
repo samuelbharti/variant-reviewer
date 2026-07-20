@@ -117,5 +117,7 @@ chat_panel <- byok_chat_ui(
     "Hi! Open **Model & key** (the gear button), choose a model, and click",
     "**Connect** — a key set in the environment is used automatically; otherwise",
     "paste your own. Then ask me about the gene or variant you're reviewing."
-  )
+  ),
+  # Clickable example-prompt chips below the input (fill-to-edit on click).
+  suggestions = VR_CHAT_SUGGESTIONS
 )

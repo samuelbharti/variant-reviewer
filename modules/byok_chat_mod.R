@@ -288,6 +288,34 @@
   )
 }
 
+# Clickable example-prompt chips shown below the chat input. Clicking one drops
+# its full prompt into the input box (see the server) so the user can edit and
+# send it. `suggestions` is a character vector; names are the short chip labels.
+# Returns NULL when there are none, so chat_ui() gets no footer.
+.byok_chat_input_chips <- function(ns, suggestions) {
+  if (is.null(suggestions) || length(suggestions) == 0) {
+    return(NULL)
+  }
+  labels <- names(suggestions)
+  div(
+    class = "d-flex flex-wrap align-items-center gap-1",
+    tags$span(class = "text-muted small me-1", "Try:"),
+    lapply(seq_along(suggestions), function(i) {
+      label <- if (!is.null(labels) && nzchar(labels[[i]])) {
+        labels[[i]]
+      } else {
+        suggestions[[i]]
+      }
+      actionButton(
+        ns(paste0("suggest_", i)),
+        label,
+        class = "btn btn-outline-secondary btn-sm py-0",
+        title = unname(suggestions[[i]])
+      )
+    })
+  )
+}
+
 byok_chat_ui <- function(
   id,
   title = "AI assistant",
@@ -297,7 +325,8 @@ byok_chat_ui <- function(
   sidebar_width = 320,
   list_models = TRUE,
   placeholder = "Ask me anything...",
-  greeting = NULL
+  greeting = NULL,
+  suggestions = NULL
 ) {
   ns <- NS(id)
 
@@ -329,10 +358,10 @@ byok_chat_ui <- function(
 
   # The provider/key/model controls live in an offcanvas drawer (Bootstrap 5)
   # toggled from a gear button in the chat header, so the conversation uses the
-  # full width of its container and the controls never crowd it. `backdrop =
-  # false` + `scroll = true` keep the rest of the app interactive while the
-  # drawer is open, so configuring never blocks the workflow. bslib bundles
-  # Bootstrap's JS, so the data-bs-* toggle/dismiss attributes need no extra deps.
+  # full width of its container and the controls never crowd it. It uses
+  # Bootstrap's default backdrop, which dims the rest of the app while the drawer
+  # is open. bslib bundles Bootstrap's JS, so the data-bs-* toggle/dismiss
+  # attributes need no extra deps.
   cfg_id <- ns("config")
 
   # Default to a provider that already has a key in the environment, so the
@@ -415,8 +444,6 @@ byok_chat_ui <- function(
     tabindex = "-1",
     id = cfg_id,
     style = paste0("width:", sidebar_width, "px;"),
-    `data-bs-backdrop` = "false",
-    `data-bs-scroll` = "true",
     `aria-labelledby` = paste0(cfg_id, "_label"),
     div(
       class = "offcanvas-header",
@@ -476,7 +503,10 @@ byok_chat_ui <- function(
             paste(
               "Hi! Open **Model & key**, paste an API key, and click **Connect**",
               "to start chatting."
-            )
+            ),
+          # Clickable example prompts rendered just below the input; clicking
+          # one fills the input box (handled in the server).
+          footer = .byok_chat_input_chips(ns, suggestions)
         )
       )
     )
@@ -817,6 +847,20 @@ byok_chat_server <- function(
         )
       }
     })
+
+    # Clicking an example-prompt chip drops its full text into the input box
+    # (not submitted), so the user can edit it before sending.
+    if (!is.null(suggestions) && length(suggestions) > 0) {
+      lapply(seq_along(suggestions), function(i) {
+        observeEvent(input[[paste0("suggest_", i)]], {
+          shinychat::update_chat_user_input(
+            "chat",
+            value = unname(suggestions[[i]]),
+            focus = TRUE
+          )
+        })
+      })
+    }
 
     output$key_help <- renderUI({
       prov <- input$provider

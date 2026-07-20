@@ -177,3 +177,24 @@ test_that(".byok_chat_connected_greeting includes the suggestions when present",
   without <- .byok_chat_connected_greeting("OpenAI", NULL)
   expect_no_match(without, "suggestion")
 })
+
+test_that(".byok_chat_input_chips renders a fill-on-click button per prompt", {
+  ns <- shiny::NS("chat")
+  chips <- .byok_chat_input_chips(
+    ns,
+    c(
+      "Gene overview" = "Load TP53.",
+      "Interactions" = "Top partners for EGFR?"
+    )
+  )
+  html <- as.character(chips)
+  # One namespaced actionButton per suggestion, labelled by the chip heading,
+  # with the full prompt in the title attribute (server fills it into the box).
+  expect_match(html, 'id="chat-suggest_1"', fixed = TRUE)
+  expect_match(html, 'id="chat-suggest_2"', fixed = TRUE)
+  expect_match(html, "Gene overview", fixed = TRUE)
+  expect_match(html, 'title="Load TP53."', fixed = TRUE)
+
+  expect_null(.byok_chat_input_chips(ns, NULL))
+  expect_null(.byok_chat_input_chips(ns, character(0)))
+})

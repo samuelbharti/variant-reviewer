@@ -34,6 +34,11 @@ options(
   )
 )
 
+# Hide the assistant's tool-call cards in chat responses so the conversation
+# reads cleanly (the assistant still uses tools; only their UI cards are hidden).
+# Choices: "none", "basic", "rich" (shinychat default).
+options(shinychat.tool_display = "none")
+
 source("R/load_components.R")
 
 # Load data/connections

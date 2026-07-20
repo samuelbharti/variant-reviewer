@@ -21,6 +21,16 @@ VR_CHAT_CARDS <- c(
   diseases = "Disease associations (Open Targets)"
 )
 
+# Example prompts offered to the user (names are the short chip/card headings;
+# values are the text sent/inserted). Shown two ways: as clickable chips at the
+# chat input (fill-to-edit) and as suggestion cards in the connected greeting.
+VR_CHAT_SUGGESTIONS <- c(
+  "Gene overview" = "Load TP53 and summarize what it does and its top disease associations.",
+  "Variant significance" = "Is BRAF V600E (rs113488022) pathogenic? Cite ClinVar and its gnomAD frequency.",
+  "Tissue expression" = "Load BRCA1 and tell me which tissues express it most highly.",
+  "Interactions" = "What are the top STRING interaction partners for EGFR?"
+)
+
 # First value, or a default when blank.
 .vr_or <- function(x, default = "n/a") {
   if (is_blank(x)) default else as.character(x)[1]
