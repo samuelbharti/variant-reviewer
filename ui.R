@@ -9,7 +9,10 @@ page_navbar(
   theme = bslib::bs_theme(brand = TRUE),
   fillable = FALSE,
   header = tags$head(
-    tags$link(rel = "stylesheet", type = "text/css", href = "css/app.css")
+    tags$link(rel = "stylesheet", type = "text/css", href = "css/app.css"),
+    # Attach cicerone's assets when installed; the Demo button drives a guided
+    # walkthrough with it (see R/demo_tour.R and the demo handler in server.R).
+    if (requireNamespace("cicerone", quietly = TRUE)) cicerone::use_cicerone()
   ),
   nav_panel(
     title = "Home",
@@ -27,7 +30,7 @@ page_navbar(
           ),
           dashboard_page
         ),
-        div(class = "vr-chat-col", chat_panel)
+        div(id = "tour_chat", class = "vr-chat-col", chat_panel)
       )
     )
   ),

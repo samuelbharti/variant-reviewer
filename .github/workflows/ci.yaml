@@ -38,6 +38,7 @@ jobs:
             any::reactable
             any::jsonlite
             any::shinycssloaders
+            any::cicerone
       - name: Lint
         run: |
           lints <- lintr::lint_dir(".")
@@ -73,6 +74,7 @@ jobs:
             any::reactable
             any::jsonlite
             any::shinycssloaders
+            any::cicerone
             any::shinytest2
             any::testthat
       - name: Run tests (app smoke test)
