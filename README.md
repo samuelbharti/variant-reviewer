@@ -13,11 +13,15 @@ The app is a thin, reactive front end over several public bioinformatics APIs:
 | Variant annotation      | MyVariant                         |
 | In-silico predictions   | dbNSFP (MyVariant)                |
 | Protein context         | ProtVar (EBI)                     |
+| Variant landscape       | ClinVar variants (gnomAD) + UniProt domains |
+| Conservation            | dbNSFP (MyVariant)                |
+| Ancestry frequency      | gnomAD                            |
 | Protein domains         | UniProt (EBI Proteins)            |
 | 3D structure            | AlphaFold DB                      |
 | Clinical significance   | ClinVar (NCBI E-utilities)        |
 | Population frequency    | gnomAD                            |
 | Gene constraint         | gnomAD                            |
+| Gene model              | Ensembl                           |
 | Variant consequences    | Ensembl VEP                       |
 | Tissue expression       | GTEx                              |
 | Protein interactions    | STRING                            |

@@ -126,6 +126,14 @@ src_ensembl_variant <- function(rsid) {
   }
 }
 
+src_ensembl_gene <- function(ensembl_gene) {
+  if (is_blank(ensembl_gene)) {
+    NULL
+  } else {
+    paste0("https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=", ensembl_gene)
+  }
+}
+
 src_clinvar_variation <- function(uid) {
   if (is_blank(uid)) {
     NULL

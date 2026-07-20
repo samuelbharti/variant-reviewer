@@ -224,6 +224,90 @@ myvariant_parse_predictions <- function(hit) {
   list(ok = TRUE, predictions = entries)
 }
 
+# Evolutionary conservation scores for a variant's position, from dbNSFP via
+# MyVariant. Higher scores/ranks mean a more conserved (less tolerant) position,
+# a supporting line of evidence in variant interpretation. The whole dbnsfp
+# block is fetched because the "gerp++" key cannot be requested through the
+# field selector. Returns:
+#   list(ok = TRUE, metrics = data.frame(metric, score, rankscore))
+#   list(ok = FALSE, error = "...")
+myvariant_conservation <- function(variant) {
+  if (is_blank(variant)) {
+    return(list(ok = FALSE, error = "No variant supplied."))
+  }
+  if (!myvariant_is_queryable(variant)) {
+    return(list(
+      ok = FALSE,
+      error = "Enter an rsID (rs...) or HGVS for conservation scores."
+    ))
+  }
+  term <- trimws(as.character(variant))
+  res <- vr_api_get(
+    MYVARIANT_BASE,
+    path = "query",
+    query = list(q = term, size = 1, fields = "dbnsfp"),
+    source = "MyVariant"
+  )
+  if (!res$ok) {
+    return(list(ok = FALSE, error = res$error))
+  }
+  hits <- res$data$hits
+  if (is.null(hits) || length(hits) == 0) {
+    return(list(
+      ok = FALSE,
+      error = paste0("No conservation scores found for '", term, "'.")
+    ))
+  }
+  myvariant_parse_conservation(hits[[1]])
+}
+
+# One conservation-metric row (numeric score + 0-1 rankscore, NA when absent).
+.mv_cons_row <- function(metric, score, rankscore) {
+  data.frame(
+    metric = metric,
+    score = suppressWarnings(as.numeric(score %||% NA)),
+    rankscore = suppressWarnings(as.numeric(rankscore %||% NA)),
+    stringsAsFactors = FALSE
+  )
+}
+
+# Pure parser: pull the four common conservation metrics out of a dbNSFP hit.
+myvariant_parse_conservation <- function(hit) {
+  d <- pluck_at(hit, "dbnsfp")
+  rows <- list(
+    .mv_cons_row(
+      "phyloP (100-way vertebrate)",
+      pluck_at(d, "phylop", "100way_vertebrate", "score"),
+      pluck_at(d, "phylop", "100way_vertebrate", "rankscore")
+    ),
+    .mv_cons_row(
+      "phastCons (100-way vertebrate)",
+      pluck_at(d, "phastcons", "100way_vertebrate", "score"),
+      pluck_at(d, "phastcons", "100way_vertebrate", "rankscore")
+    ),
+    .mv_cons_row(
+      "GERP++ RS",
+      pluck_at(d, "gerp++", "rs"),
+      pluck_at(d, "gerp++", "rs_rankscore")
+    ),
+    .mv_cons_row(
+      "SiPhy (29-way)",
+      pluck_at(d, "siphy_29way", "logodds_score"),
+      pluck_at(d, "siphy_29way", "logodds_rankscore")
+    )
+  )
+  df <- do.call(rbind, rows)
+  df <- df[!(is.na(df$score) & is.na(df$rankscore)), , drop = FALSE]
+  if (nrow(df) == 0) {
+    return(list(
+      ok = FALSE,
+      error = "No conservation scores available for this variant."
+    ))
+  }
+  rownames(df) <- NULL
+  list(ok = TRUE, metrics = df)
+}
+
 # Notable variants for a gene: ClinVar pathogenic / likely-pathogenic variants
 # that carry an rsID, used to populate the search box's variant suggestions.
 # Returns:

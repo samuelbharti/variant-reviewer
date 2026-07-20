@@ -10,11 +10,14 @@ VR_CHAT_CARDS <- c(
   variant = "Variant annotation",
   predictions = "In-silico predictions",
   protein = "Protein context (ProtVar)",
+  landscape = "Variant landscape (ClinVar lollipop)",
+  conservation = "Conservation scores",
   domains = "Protein domains & features",
   structure = "3D structure (AlphaFold)",
   clinvar = "Clinical significance (ClinVar)",
   gnomad = "Population frequency (gnomAD)",
   constraint = "Gene constraint (gnomAD)",
+  genemodel = "Gene model (Ensembl exons)",
   consequences = "Variant consequences (Ensembl VEP)",
   expression = "Tissue expression (GTEx)",
   interactions = "Protein interactions (STRING)",
@@ -399,6 +402,78 @@ vr_chat_diseases <- function(res) {
   )
 }
 
+vr_chat_landscape <- function(res) {
+  g <- .vr_card_guard(res, "No variant landscape yet (needs a gene).")
+  if (!is.null(g)) {
+    return(g)
+  }
+  df <- res$variants
+  if (!is.data.frame(df) || nrow(df) == 0) {
+    return("No ClinVar variants to place on the protein.")
+  }
+  path <- sum(df$n[df$category == "Pathogenic / likely"], na.rm = TRUE)
+  q <- if (!is.null(res$queried) && !is.na(res$queried)) {
+    paste0(" Queried variant at residue ", res$queried, ".")
+  } else {
+    ""
+  }
+  paste0(
+    sum(df$n),
+    " ClinVar variants across ",
+    nrow(df),
+    " residues (",
+    path,
+    " pathogenic/likely).",
+    q
+  )
+}
+
+vr_chat_conservation <- function(res) {
+  g <- .vr_card_guard(res, "No conservation scores yet (needs a variant).")
+  if (!is.null(g)) {
+    return(g)
+  }
+  df <- res$metrics
+  rows <- .vr_rows(df, nrow(df), function(i) {
+    paste0(
+      df$metric[i],
+      " ",
+      if (is.na(df$score[i])) {
+        "n/a"
+      } else {
+        formatC(df$score[i], format = "g", digits = 3)
+      },
+      " (rank ",
+      if (is.na(df$rankscore[i])) {
+        "n/a"
+      } else {
+        formatC(df$rankscore[i], format = "f", digits = 2)
+      },
+      ")"
+    )
+  })
+  paste0("Conservation: ", paste(rows, collapse = "; "), ".")
+}
+
+vr_chat_genemodel <- function(res) {
+  g <- .vr_card_guard(res, "No gene model yet (needs a gene).")
+  if (!is.null(g)) {
+    return(g)
+  }
+  strand <- if (isTRUE(res$strand < 0)) "-" else "+"
+  paste0(
+    "Canonical transcript ",
+    .vr_or(res$transcript),
+    " on chr",
+    .vr_or(res$region),
+    " (",
+    strand,
+    " strand) with ",
+    if (is.data.frame(res$exons)) nrow(res$exons) else 0L,
+    " exons."
+  )
+}
+
 # Dispatch: format one card's data by id. Unknown ids report themselves rather
 # than error, so a bad tool argument degrades gracefully.
 vr_chat_card_text <- function(card, data) {
@@ -408,11 +483,14 @@ vr_chat_card_text <- function(card, data) {
     variant = vr_chat_variant,
     predictions = vr_chat_predictions,
     protein = vr_chat_protein,
+    landscape = vr_chat_landscape,
+    conservation = vr_chat_conservation,
     domains = vr_chat_domains,
     structure = vr_chat_structure,
     clinvar = vr_chat_clinvar,
     gnomad = vr_chat_gnomad,
     constraint = vr_chat_constraint,
+    genemodel = vr_chat_genemodel,
     consequences = vr_chat_consequences,
     expression = vr_chat_expression,
     interactions = vr_chat_interactions,

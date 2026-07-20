@@ -4,6 +4,15 @@ All notable changes to this project should be documented in this file.
 
 ## [Unreleased]
 
+- Added four visualization cards: a **Variant landscape** protein "lollipop"
+  (every ClinVar variant placed at its residue, coloured by significance, over
+  the UniProt domain track, with the queried variant marked); a **Conservation**
+  card (phyloP, phastCons, GERP++, SiPhy ranks from dbNSFP); an **Ancestry
+  frequency** card (gnomAD allele frequency by genetic-ancestry group, reusing
+  the shared gnomAD result); and a **Gene model** card (the canonical
+  transcript's exons drawn 5'->3', with the variant's exon highlighted — the
+  position is taken from gnomAD, and exons are numbered strand-aware). All four
+  are readable by the assistant via `read_card`.
 - Turned the variant box into a typeahead: once a gene is entered, it suggests
   that gene's known pathogenic / likely-pathogenic variants (from ClinVar via
   MyVariant), labelled by amino-acid change and rsID (e.g. `V600E — rs113488022
