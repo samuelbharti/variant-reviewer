@@ -15,6 +15,25 @@ if (requireNamespace("thematic", quietly = TRUE)) {
   thematic::thematic_shiny(font = "auto")
 }
 
+# Theme reactable tables to match the bslib theme. reactable renders its own
+# (light) theme by default, which clashes with the app palette; binding its
+# colors to Bootstrap CSS variables makes every table adopt the theme (borders,
+# text, header, hover) and track it if the palette changes.
+options(
+  reactable.theme = reactable::reactableTheme(
+    color = "var(--bs-body-color)",
+    backgroundColor = "transparent",
+    borderColor = "var(--bs-border-color)",
+    stripedColor = "var(--bs-tertiary-bg)",
+    highlightColor = "var(--bs-secondary-bg)",
+    cellPadding = "6px 8px",
+    headerStyle = list(
+      backgroundColor = "var(--bs-tertiary-bg)",
+      borderColor = "var(--bs-border-color)"
+    )
+  )
+)
+
 source("R/load_components.R")
 
 # Load data/connections
