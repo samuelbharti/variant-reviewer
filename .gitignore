@@ -19,3 +19,10 @@ dev/.Rhistory
 /plans/
 /skills/
 scratchpad/
+docs/local/
+
+# Local caches and any downloaded reference data. Small bundled files (e.g. the
+# MANE summary) are tracked deliberately; anything landing here is not.
+data/cache/
+*.vcf.gz
+*.vcf.gz.tbi

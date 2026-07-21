@@ -1,9 +1,9 @@
 # Variant Reviewer
 
 A lightweight gene and variant interpretation companion, built with Shiny. Enter
-a gene symbol (and, optionally, a variant) to pull together — on a single
-dashboard — what the gene does, where it is expressed, what it interacts with,
-and protein-level context for the variant.
+a gene symbol, a variant, or both to pull together, on a single dashboard, what
+the gene does, where it is expressed, what it interacts with, and protein-level
+context for the variant. A variant on its own resolves its gene.
 
 The app is a thin, reactive front end over several public bioinformatics APIs:
 
@@ -30,7 +30,7 @@ The app is a thin, reactive front end over several public bioinformatics APIs:
 | AI assistant (chat)     | BYOK: Gemini / OpenAI / Anthropic |
 
 All data sources are public and require no API key. The optional AI assistant is
-"bring your own key" — see [AI assistant](#ai-assistant) below.
+"bring your own key" (see [AI assistant](#ai-assistant) below).
 
 ## Scope
 
@@ -124,8 +124,8 @@ still accepting any free-typed rsID/HGVS. Before any API is
 queried, the gene and variant are validated with
 [biobouncer](https://github.com/samuelbharti/biobouncer)'s offline `pattern`
 mode (gene against the HGNC grammar, rsIDs against dbSNP), so malformed input is
-rejected up front with an inline message rather than firing failing lookups —
-the same gate covers the assistant's `set_selection`. `server.R` resolves
+rejected up front with an inline message rather than firing failing lookups.
+The same gate covers the assistant's `set_selection`. `server.R` resolves
 the gene **once** via MyGene (symbol → Ensembl / Entrez / UniProt) and shares
 that with every gene-level module, so each API is queried only when needed. API
 clients are pure R (in `R/`, individually testable); modules only orchestrate
@@ -155,19 +155,28 @@ for discussing the gene or variant you're reviewing. It is **bring your own key
 (BYOK)**: open the chat's **Model & key** drawer (the gear button in the chat
 header), pick a provider (Google Gemini, OpenAI, or Anthropic), and paste your
 own API key, which is held only in your session's server memory and never
-written to disk. Alternatively, set a server-side key via the
-matching environment variable (`GEMINI_API_KEY` / `GOOGLE_API_KEY`,
-`OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`) and connect with the key field blank.
+written to disk. Pasting the key loads the models that key can actually reach,
+so the picker fills in on its own; you can still type any model id the key
+supports. Gemini starts on `gemini-flash-lite-latest`. Alternatively, set a
+server-side key via the matching environment variable (`GEMINI_API_KEY` /
+`GOOGLE_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`) and connect with the
+key field blank.
 
 The assistant is grounded in the dashboard through app-scoped tools (wired in
 [server.R](server.R), formatters in [R/chat_tools.R](R/chat_tools.R)):
 
-- `get_current_selection` — the gene/variant currently loaded.
-- `read_card` — the data shown in a specific card (gene, variant, predictions,
+- `get_current_selection`: the gene/variant currently loaded.
+- `read_card`: the data shown in a specific card (gene, variant, predictions,
   protein, domains, structure, clinvar, gnomad, constraint, consequences,
   expression, interactions, diseases).
-- `set_selection` — load a gene (and optional variant) into the dashboard,
-  running the app's own lookups.
+- `set_selection`: type a gene, a variant, or both into the search box and
+  click Review, exactly as you would.
+
+Reading is unrestricted, but searching is the only change the assistant can
+make: `set_selection` drives the search box and the app fills the cards itself,
+so the assistant cannot write to a card or edit what one shows. The request goes
+through the same validation as a typed search, and the gene/variant it used
+stays visible in the search box.
 
 It works through the app's data and lookups rather than searching externally. It
 requires the `ellmer` and `shinychat` packages; if they are absent the card
@@ -175,7 +184,7 @@ renders a short setup panel and the rest of the app loads normally.
 
 ## Theming
 
-Branding lives in [`_brand.yml`](_brand.yml) — colors, fonts, and logo in one
+Branding lives in [`_brand.yml`](_brand.yml): colors, fonts, and logo in one
 place, applied by bslib via `bs_theme(brand = TRUE)` in [ui.R](ui.R).
 
 ## Contributing

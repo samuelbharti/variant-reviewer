@@ -22,6 +22,9 @@ page_navbar(
       # Results (width 9) on the left scroll with the page; the chat (width 3)
       # on the right stays pinned in view (see .vr-chat-col in app.css).
       layout_columns(
+        # vr-home-grid pins the assistant to a fixed-width track on wide screens
+        # (see app.css); col_widths still governs narrower ones.
+        class = "vr-home-grid",
         col_widths = c(9, 3),
         div(
           tags$p(

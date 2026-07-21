@@ -432,7 +432,7 @@ myvariant_variant_choices <- function(parsed, max_n = 100) {
   disp <- ifelse(
     is.na(v$label),
     sprintf("%s (%s)", v$rsid, v$significance),
-    sprintf("%s — %s (%s)", v$label, v$rsid, v$significance)
+    sprintf("%s, %s (%s)", v$label, v$rsid, v$significance)
   )
   stats::setNames(v$rsid, disp)
 }

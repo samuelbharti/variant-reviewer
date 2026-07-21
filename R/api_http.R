@@ -9,10 +9,53 @@
 #
 # Successful responses are cached in-process for VR_CACHE_TTL seconds so
 # repeated searches for the same gene/variant are instant; failures are never
-# cached, so a transient outage doesn't get stuck.
+# cached, so a transient outage doesn't get stuck. TTL and the size ceilings are
+# overridable with the VR_CACHE_TTL / VR_CACHE_MAX_SIZE / VR_CACHE_MAX_N
+# environment variables.
 
-VR_CACHE_TTL <- 1800 # 30 minutes
-vr_cache <- cachem::cache_mem(max_age = VR_CACHE_TTL)
+# A positive number from an environment variable, else the default. Keeps a
+# blank or malformed setting from silently disabling the cache.
+.vr_env_num <- function(name, default) {
+  raw <- Sys.getenv(name, unset = "")
+  if (!nzchar(raw)) {
+    return(default)
+  }
+  val <- suppressWarnings(as.numeric(raw))
+  if (length(val) != 1L || is.na(val) || val <= 0) default else val
+}
+
+VR_CACHE_TTL <- .vr_env_num("VR_CACHE_TTL", 1800) # 30 minutes
+# Ceilings so a long-running server cannot grow without bound. cachem evicts
+# least-recently-used first when either is reached, so the genes people are
+# actually looking at stay warm and the long tail falls out.
+VR_CACHE_MAX_SIZE <- .vr_env_num("VR_CACHE_MAX_SIZE", 256 * 1024^2) # 256 MB
+VR_CACHE_MAX_N <- .vr_env_num("VR_CACHE_MAX_N", 5000)
+
+# One cache for the whole process, deliberately shared across sessions: a gene
+# one user looks at is warm for the next. It holds only public API responses,
+# never anything user-specific, so there is nothing to leak between sessions.
+vr_cache <- cachem::cache_mem(
+  max_age = VR_CACHE_TTL,
+  max_size = VR_CACHE_MAX_SIZE,
+  max_n = VR_CACHE_MAX_N,
+  evict = "lru"
+)
+
+# What the cache is holding right now, for the console or a health check.
+vr_cache_stats <- function() {
+  list(
+    entries = vr_cache$size(),
+    max_entries = VR_CACHE_MAX_N,
+    max_size_bytes = VR_CACHE_MAX_SIZE,
+    ttl_seconds = VR_CACHE_TTL
+  )
+}
+
+# Drop everything (e.g. to force a refetch after an upstream fixes bad data).
+vr_cache_clear <- function() {
+  vr_cache$reset()
+  invisible(TRUE)
+}
 
 # Stable cache key for a request (lowercase hex hash -> valid cachem key).
 vr_cache_key <- function(...) {
@@ -130,7 +173,7 @@ vr_http_error_message <- function(
     return(paste0(
       "Couldn't reach ",
       source,
-      " — please check your internet connection and try again."
+      ". Please check your internet connection and try again."
     ))
   }
   paste0(source, " is temporarily unavailable. Please try again shortly.")

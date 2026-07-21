@@ -55,6 +55,33 @@ test_that("gene_search_server prefetches variant suggestions for the gene", {
   })
 })
 
+test_that("an outside request runs through the same submit as a Review click", {
+  # The assistant hands the module a request; the module fills its inputs and
+  # submits, so the query comes out exactly as if the user had clicked Review.
+  requested <- reactiveVal(NULL)
+  testServer(gene_search_server, args = list(requested = requested), {
+    expect_null(session$returned())
+
+    requested(list(gene = "BRAF", variant = "rs113488022", nonce = 1L))
+    session$flushReact()
+    query <- session$returned()
+    expect_equal(query$gene, "BRAF")
+    expect_equal(query$variant, "rs113488022")
+  })
+})
+
+test_that("an outside request is validated like a typed one", {
+  requested <- reactiveVal(NULL)
+  testServer(gene_search_server, args = list(requested = requested), {
+    # A malformed gene is rejected at the same gate, so no query is emitted and
+    # no downstream lookups fire.
+    requested(list(gene = "not a gene!", variant = NULL, nonce = 1L))
+    session$flushReact()
+    expect_null(session$returned())
+    expect_false(is.null(validation()))
+  })
+})
+
 test_that("gene_search_server returns NULL variant when omitted", {
   testServer(gene_search_server, {
     session$setInputs(gene = "BRCA1", variant = "", submit = 1)

@@ -25,13 +25,25 @@
   links = "External links"
 )
 
+# Cards that start un-ticked, so they cost no API call until the user turns them
+# on. The Ensembl gene model is here because rest.ensembl.org is slow and often
+# times out; it stays one click away in the Cards popover.
+.dashboard_cards_default_off <- c("genemodel")
+
+# The cards shown on load (everything except the default-off set). Reused by the
+# Demo so its walkthrough enables the same set.
+.dashboard_cards_default_on <- setdiff(
+  names(.dashboard_cards),
+  .dashboard_cards_default_off
+)
+
 # Show a card only when its id is ticked in the `visible_cards` control. The
 # JS runs client-side, so toggling is instant and needs no server round-trip.
 # The inner `tour_<id>` div is the anchor the Demo walkthrough highlights (see
 # R/demo_tour.R); it must stay a plain, height-auto block so it doesn't stretch
 # a card to fill the tall left column (which would leave large gaps). It exists
-# only while the card is shown, which is why the demo re-ticks every card before
-# starting the tour.
+# only while the card is shown, which is why the demo re-ticks the default-on
+# cards before starting the tour.
 .card_when_shown <- function(id, ui) {
   conditionalPanel(
     condition = sprintf(
@@ -42,7 +54,8 @@
   )
 }
 
-# Popover to pick which result cards are shown (all ticked by default).
+# Popover to pick which result cards are shown (all but the default-off set are
+# ticked on load).
 .cards_toggle <- div(
   class = "d-flex justify-content-end mb-2",
   popover(
@@ -59,7 +72,7 @@
         names(.dashboard_cards),
         unname(.dashboard_cards)
       ),
-      selected = names(.dashboard_cards)
+      selected = .dashboard_cards_default_on
     ),
     title = "Show cards",
     placement = "bottom"
@@ -148,9 +161,9 @@ chat_panel <- byok_chat_ui(
   # Widen the Model & key drawer so the provider/model controls have room.
   sidebar_width = 470,
   greeting = paste(
-    "Hi! Open **Model & key** (the gear button), choose a model, and click",
-    "**Connect** — a key set in the environment is used automatically; otherwise",
-    "paste your own. Then ask me about the gene or variant you're reviewing.",
-    "Once connected, clickable example prompts appear right here in the chat."
+    "Hi! Open **Model & key** (the gear button), paste your API key, choose a",
+    "model, and click **Connect**. Then ask me about the gene or variant you're",
+    "reviewing. Once connected, clickable example prompts appear right here in",
+    "the chat. (If a key is set in the environment, I connect on my own.)"
   )
 )

@@ -59,6 +59,33 @@ protvar_annotate <- function(accession, position) {
   )
 }
 
+# UniProt FUNCTION comments carry their evidence inline, e.g. "...binding to its
+# target DNA sequence (PubMed:11025664, PubMed:12524540, PubMed:12810724)". For
+# TP53 the citations are longer than the prose they support, which is noise on a
+# dashboard card. Drop the citation groups and tidy the punctuation left behind,
+# keeping non-citation notes like "(By similarity)".
+protvar_strip_citations <- function(text) {
+  if (is_blank(text)) {
+    return(text)
+  }
+  ref <- "(?:PubMed:\\d+|Ref\\.\\s*\\d+|ECO:[0-9|.A-Za-z:-]+)"
+  out <- as.character(text)
+  # Parentheticals that are nothing but citations.
+  out <- gsub(
+    sprintf("\\s*\\(%s(?:\\s*[,;]\\s*%s)*\\)", ref, ref),
+    "",
+    out,
+    perl = TRUE
+  )
+  # Citations mixed into a parenthetical that also says something else.
+  out <- gsub(sprintf("\\s*[,;]?\\s*%s", ref), "", out, perl = TRUE)
+  # Tidy up: empty brackets, space before punctuation, doubled spaces.
+  out <- gsub("\\(\\s*[,;]*\\s*\\)", "", out, perl = TRUE)
+  out <- gsub("\\s+([.,;:])", "\\1", out, perl = TRUE)
+  out <- gsub("\\s{2,}", " ", out, perl = TRUE)
+  trimws(out)
+}
+
 # Pull the first FUNCTION comment text from a /function response.
 protvar_function_text <- function(data) {
   comments <- pluck_at(data, "comments")
@@ -69,11 +96,11 @@ protvar_function_text <- function(data) {
     if (identical(pluck_at(cm, "type"), "FUNCTION")) {
       txt <- pluck_at(cm, "text")
       if (!is.null(txt) && length(txt) > 0) {
-        return(as.character(pluck_at(
+        return(protvar_strip_citations(as.character(pluck_at(
           txt[[1]],
           "value",
           default = NA_character_
-        )))
+        ))))
       }
     }
   }

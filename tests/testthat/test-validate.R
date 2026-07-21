@@ -45,3 +45,12 @@ test_that("vr_validate_query collects errors from both fields", {
   expect_false(bad$ok)
   expect_length(bad$errors, 2)
 })
+
+test_that("vr_validate_query allows a variant alone but needs at least one field", {
+  expect_true(vr_validate_query(NULL, "rs113488022")$ok)
+  expect_true(vr_validate_query("", "rs113488022")$ok)
+
+  both_blank <- vr_validate_query("", "")
+  expect_false(both_blank$ok)
+  expect_match(both_blank$errors, "gene symbol or a variant")
+})
