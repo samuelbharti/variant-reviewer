@@ -26,7 +26,7 @@ vr_validate_gene <- function(gene) {
     return(list(
       ok = FALSE,
       error = sprintf(
-        "“%s” is not a valid gene symbol — enter an HGNC symbol like TP53 or BRAF.",
+        "“%s” is not a valid gene symbol. Enter an HGNC symbol like TP53 or BRAF.",
         gene
       )
     ))
@@ -52,7 +52,7 @@ vr_validate_variant <- function(variant) {
       return(list(
         ok = FALSE,
         error = sprintf(
-          "“%s” is not a valid dbSNP rsID — use a form like rs113488022.",
+          "“%s” is not a valid dbSNP rsID. Use a form like rs113488022.",
           variant
         )
       ))
@@ -61,17 +61,27 @@ vr_validate_variant <- function(variant) {
   list(ok = TRUE)
 }
 
-# Validate a full gene/variant query. Returns list(ok = TRUE) when both pass,
-# otherwise list(ok = FALSE, errors = <character vector of messages>).
+# Validate a full gene/variant query. A search needs a gene, a variant, or both;
+# whichever is present is format-checked. Returns list(ok = TRUE) when the
+# present fields pass, otherwise list(ok = FALSE, errors = <character vector>).
 vr_validate_query <- function(gene, variant = NULL) {
-  errors <- character()
-  g <- vr_validate_gene(gene)
-  if (!isTRUE(g$ok)) {
-    errors <- c(errors, g$error)
+  gene_present <- !is_blank(gene)
+  variant_present <- !is_blank(variant)
+  if (!gene_present && !variant_present) {
+    return(list(ok = FALSE, errors = "Enter a gene symbol or a variant."))
   }
-  v <- vr_validate_variant(variant)
-  if (!isTRUE(v$ok)) {
-    errors <- c(errors, v$error)
+  errors <- character()
+  if (gene_present) {
+    g <- vr_validate_gene(gene)
+    if (!isTRUE(g$ok)) {
+      errors <- c(errors, g$error)
+    }
+  }
+  if (variant_present) {
+    v <- vr_validate_variant(variant)
+    if (!isTRUE(v$ok)) {
+      errors <- c(errors, v$error)
+    }
   }
   if (length(errors) > 0) {
     return(list(ok = FALSE, errors = errors))

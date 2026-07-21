@@ -28,7 +28,7 @@ gene_search_ui <- function(id) {
         # typed (create = TRUE), so it doubles as a free-text field.
         selectizeInput(
           ns("variant"),
-          label = "Variant (optional)",
+          label = "Variant",
           choices = NULL,
           multiple = FALSE,
           width = "100%",
@@ -52,6 +52,12 @@ gene_search_ui <- function(id) {
             class = "btn-primary"
           )
         )
+      ),
+      # Either field is enough: a gene, a variant (rsID or HGVS), or both. A
+      # lone variant resolves its own gene to fill the gene-level cards.
+      tags$div(
+        class = "small text-muted",
+        "Enter a gene, a variant (rsID or HGVS), or both."
       ),
       # One-click example so a first-time visitor can see a populated dashboard
       # without knowing a gene/variant off-hand.
