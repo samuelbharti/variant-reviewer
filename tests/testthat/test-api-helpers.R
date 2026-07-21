@@ -63,3 +63,37 @@ test_that("vr_cached() caches successes but not failures", {
 
   vr_cache$reset()
 })
+
+test_that("the cache is bounded and reports what it holds", {
+  vr_cache_clear()
+  stats <- vr_cache_stats()
+  expect_identical(stats$entries, 0L)
+  # Ceilings must be real numbers, or a long-running server grows without bound.
+  expect_true(is.finite(stats$max_entries) && stats$max_entries > 0)
+  expect_true(is.finite(stats$max_size_bytes) && stats$max_size_bytes > 0)
+  expect_identical(stats$ttl_seconds, VR_CACHE_TTL)
+
+  vr_cached(vr_cache_key("test", "counted"), function() {
+    list(ok = TRUE, data = 1)
+  })
+  expect_identical(vr_cache_stats()$entries, 1L)
+
+  expect_true(vr_cache_clear())
+  expect_identical(vr_cache_stats()$entries, 0L)
+})
+
+test_that(".vr_env_num() falls back when a setting is blank or malformed", {
+  skip_if_not_installed("withr")
+  withr::local_envvar(c(VR_TEST_NUM = ""))
+  expect_identical(.vr_env_num("VR_TEST_NUM", 42), 42)
+
+  withr::local_envvar(c(VR_TEST_NUM = "not-a-number"))
+  expect_identical(.vr_env_num("VR_TEST_NUM", 42), 42)
+
+  # A zero or negative TTL would disable caching by accident.
+  withr::local_envvar(c(VR_TEST_NUM = "0"))
+  expect_identical(.vr_env_num("VR_TEST_NUM", 42), 42)
+
+  withr::local_envvar(c(VR_TEST_NUM = "900"))
+  expect_identical(.vr_env_num("VR_TEST_NUM", 42), 900)
+})
