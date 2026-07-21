@@ -388,7 +388,7 @@ byok_chat_ui <- function(
     passwordInput(
       ns("api_key"),
       "API key",
-      placeholder = "Paste your key — models load automatically",
+      placeholder = "Paste your key; models load automatically",
       width = "100%"
     ),
     # Model picker: choose a suggested model or type any id the key supports
@@ -550,7 +550,7 @@ byok_chat_ui <- function(
   if (is.null(md)) {
     return(paste0(head, "."))
   }
-  paste0(head, " — or try one of these:\n\n", md)
+  paste0(head, ". Or try one of these:\n\n", md)
 }
 
 # Set the chat greeting, degrading silently on older shinychat (no-op) or any
@@ -629,6 +629,9 @@ byok_chat_server <- function(
     active_secret <- reactiveVal("")
     # Note shown under the model picker (fallback vs. live-loaded count).
     model_note <- reactiveVal(NULL)
+    # Guards the on-load auto-connect so it fires at most once (for the starting
+    # provider). Later provider switches are explicit and connect manually.
+    auto_connect_pending <- reactiveVal(TRUE)
 
     # Live model lister -- injectable so tests avoid the network. Defaults to the
     # real ellmer-backed fetch.
@@ -649,7 +652,7 @@ byok_chat_server <- function(
         paste0(
           "A ",
           .byok_chat_provider_meta(prov)$label,
-          " key was found in the environment — pick a model and click Connect."
+          " key was found in the environment. Pick a model and click Connect."
         )
       } else {
         "Enter your key and click Connect."
@@ -732,6 +735,26 @@ byok_chat_server <- function(
         key <- .byok_chat_env_first(.byok_chat_provider_meta(prov)$env)
       }
       refresh_models(prov, key)
+
+      # On the initial load only, if the starting provider already has a
+      # server-side key, connect right away so the assistant is chat-ready with
+      # no clicks (the default model is preselected). Skipped when the user has
+      # pasted their own key; later provider switches always connect manually.
+      if (isTRUE(auto_connect_pending())) {
+        auto_connect_pending(FALSE)
+        pasted <- nzchar(trimws(input$api_key %||% ""))
+        if (!pasted && env_key_present(prov)) {
+          model <- trimws(input$model %||% "")
+          if (!nzchar(model)) {
+            model <- .byok_chat_provider_default_model(prov)
+          }
+          connect_with(
+            prov,
+            .byok_chat_env_first(.byok_chat_provider_meta(prov)$env),
+            model
+          )
+        }
+      }
     })
 
     # Pasting (or typing) a key loads that key's models on its own -- there is no
@@ -741,24 +764,10 @@ byok_chat_server <- function(
       refresh_models(isolate(input$provider), key_typed())
     })
 
-    observeEvent(input$connect, {
-      prov <- input$provider
-      if (is.null(prov) || !nzchar(prov)) {
-        return()
-      }
-      key <- trimws(input$api_key %||% "")
-      # Fall back to a server-side env key so the module works without pasting.
-      if (!nzchar(key)) {
-        key <- .byok_chat_env_first(.byok_chat_provider_meta(prov)$env)
-      }
-      if (!nzchar(key)) {
-        status(list(
-          ok = FALSE,
-          msg = "Paste an API key (or set the provider's environment variable)."
-        ))
-        return()
-      }
-      model <- trimws(input$model %||% "")
+    # Build the client for prov/key/model and reflect it in the UI (status badge,
+    # cleared key field, connected greeting with the example prompts). Shared by
+    # the Connect button and the on-load auto-connect below.
+    connect_with <- function(prov, key, model) {
       cl <- tryCatch(
         factory(prov, key, model),
         error = function(e) {
@@ -792,6 +801,27 @@ byok_chat_server <- function(
           suggestions
         ))
       }
+      invisible(cl)
+    }
+
+    observeEvent(input$connect, {
+      prov <- input$provider
+      if (is.null(prov) || !nzchar(prov)) {
+        return()
+      }
+      key <- trimws(input$api_key %||% "")
+      # Fall back to a server-side env key so the module works without pasting.
+      if (!nzchar(key)) {
+        key <- .byok_chat_env_first(.byok_chat_provider_meta(prov)$env)
+      }
+      if (!nzchar(key)) {
+        status(list(
+          ok = FALSE,
+          msg = "Paste an API key (or set the provider's environment variable)."
+        ))
+        return()
+      }
+      connect_with(prov, key, trimws(input$model %||% ""))
     })
 
     observeEvent(input$chat_user_input, {
@@ -852,7 +882,7 @@ byok_chat_server <- function(
           paste0(
             " A ",
             meta$label,
-            " key is set in the environment — leave the",
+            " key is set in the environment. Leave the",
             " key field blank, pick a model, and click Connect."
           )
         )

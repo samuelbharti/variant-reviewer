@@ -148,9 +148,9 @@ chat_panel <- byok_chat_ui(
   # Widen the Model & key drawer so the provider/model controls have room.
   sidebar_width = 470,
   greeting = paste(
-    "Hi! Open **Model & key** (the gear button), choose a model, and click",
-    "**Connect** — a key set in the environment is used automatically; otherwise",
-    "paste your own. Then ask me about the gene or variant you're reviewing.",
-    "Once connected, clickable example prompts appear right here in the chat."
+    "Hi! Open **Model & key** (the gear button), paste your API key, choose a",
+    "model, and click **Connect**. Then ask me about the gene or variant you're",
+    "reviewing. Once connected, clickable example prompts appear right here in",
+    "the chat. (If a key is set in the environment, I connect on my own.)"
   )
 )

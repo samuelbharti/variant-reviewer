@@ -43,6 +43,15 @@ test_that("fetch_models returns NULL (fallback) for empty key or unknown provide
 })
 
 test_that("server connects, streams, and enforces the turn limit (stubbed)", {
+  skip_if_not_installed("withr")
+  # No server-side key, so the client is built only by the manual Connect below
+  # (an env key would otherwise auto-connect on load).
+  withr::local_envvar(c(
+    OPENAI_API_KEY = "",
+    ANTHROPIC_API_KEY = "",
+    GEMINI_API_KEY = "",
+    GOOGLE_API_KEY = ""
+  ))
   rec <- new.env()
   rec$appended <- character()
   rec$streamed <- character()
@@ -184,7 +193,7 @@ test_that("a failed model lookup keeps the curated suggestions", {
   )
 })
 
-test_that("an environment key is surfaced in the status and key help", {
+test_that("an environment key auto-connects on load and is surfaced in key help", {
   skip_if_not_installed("withr")
   # Only OpenAI has a server-side key; blank the others (the dev/CI env or a
   # project .Renviron may otherwise set them).
@@ -194,10 +203,12 @@ test_that("an environment key is surfaced in the status and key help", {
     GEMINI_API_KEY = "",
     GOOGLE_API_KEY = ""
   ))
+  rec <- new.env()
   testServer(
     byok_chat_server,
     args = list(
       client_factory = function(provider, api_key, model) {
+        rec$conn <- list(provider = provider, key = api_key, model = model)
         list(stream_async = function(msg) "ok")
       },
       # An env key makes the provider switch load models; keep it off the network.
@@ -205,14 +216,24 @@ test_that("an environment key is surfaced in the status and key help", {
       append = function(response) invisible(NULL)
     ),
     {
+      # Starting on a provider that already has a server-side key connects on
+      # load with no clicks, using that key, and the key help still says so.
       session$setInputs(provider = "openai")
-      # The status invites picking a model and connecting, no pasting needed.
-      expect_match(status()$msg, "found in the environment")
+      expect_false(is.null(client()))
+      expect_true(isTRUE(status()$ok))
+      expect_identical(rec$conn$key, "sk-env-test")
       expect_match(output$key_help$html, "set in the environment")
 
-      # A provider without a server key falls back to the paste prompt.
+      # A provider without a server key does not auto-connect; it prompts.
       session$setInputs(provider = "anthropic")
+      expect_null(client())
       expect_match(status()$msg, "Enter your key")
+
+      # Returning to the env-key provider does not auto-connect again (that
+      # fires once, on load); it invites picking a model and connecting.
+      session$setInputs(provider = "openai")
+      expect_null(client())
+      expect_match(status()$msg, "found in the environment")
     }
   )
 })
