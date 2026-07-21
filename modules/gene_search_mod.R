@@ -77,7 +77,13 @@ gene_search_ui <- function(id) {
 # instead of eventReactive so reading it before any submit yields NULL rather
 # than a silent error, which lets the result cards show their initial
 # placeholder messages.
-gene_search_server <- function(id) {
+#
+# `requested` is an optional reactive carrying list(gene, variant, nonce) from
+# outside the module (the assistant). It is handled exactly like a Review click:
+# the visible inputs are filled and the same submit path runs. Callers cannot
+# write the query directly, so the search box stays the only way a search
+# starts.
+gene_search_server <- function(id, requested = reactiveVal(NULL)) {
   moduleServer(id, function(input, output, session) {
     query <- reactiveVal(NULL)
     # Validation messages from the last submit (character vector), or NULL.
@@ -135,24 +141,52 @@ gene_search_server <- function(id) {
       )
     })
 
-    observeEvent(input$submit, {
-      gene <- trimws(input$gene %||% "")
-      variant <- trimws(input$variant %||% "")
-
-      # Gate every downstream API call on a format-level check of the inputs, so
-      # a malformed gene/variant is caught here rather than firing failing
-      # lookups across the cards.
+    # The one place a query is published. Gates every downstream API call on a
+    # format-level check of the inputs, so a malformed gene/variant is caught
+    # here rather than firing failing lookups across the cards.
+    submit_query <- function(gene, variant) {
       check <- vr_validate_query(gene, if (variant == "") NULL else variant)
       if (!isTRUE(check$ok)) {
         validation(check$errors)
         query(NULL)
-        return()
+        return(invisible(FALSE))
       }
       validation(NULL)
       query(list(
         gene = gene,
         variant = if (variant == "") NULL else variant
       ))
+      invisible(TRUE)
+    }
+
+    observeEvent(input$submit, {
+      submit_query(trimws(input$gene %||% ""), trimws(input$variant %||% ""))
+    })
+
+    # An outside request (the assistant) fills the search box and then goes
+    # through the same submit as a Review click, so it gets the same validation
+    # and the user can see what was searched. `nonce` makes a repeat of the same
+    # gene/variant a fresh event.
+    observeEvent(requested(), {
+      req <- requested()
+      if (is.null(req)) {
+        return()
+      }
+      gene <- trimws(as.character(req$gene %||% ""))
+      variant <- trimws(as.character(req$variant %||% ""))
+      updateTextInput(session, "gene", value = gene)
+      updateSelectizeInput(
+        session,
+        "variant",
+        choices = if (nzchar(variant)) {
+          stats::setNames(variant, variant)
+        } else {
+          character()
+        },
+        selected = variant,
+        server = FALSE
+      )
+      submit_query(gene, variant)
     })
 
     output$validation <- renderUI({
