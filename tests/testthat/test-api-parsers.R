@@ -83,12 +83,41 @@ test_that("string_parse_rows() builds a sorted partner table", {
 test_that("protvar parsers extract function text and variants", {
   fn <- read_fixture("protvar_function_p04637_175.json")
   expect_match(protvar_function_text(fn), "transcription factor")
+  # The inline UniProt citations are stripped on the way out.
+  expect_no_match(protvar_function_text(fn), "PubMed:")
 
   pop <- read_fixture("protvar_population_p04637_175.json")
   variants <- protvar_variants_df(pop)
   expect_s3_class(variants, "data.frame")
   expect_named(variants, c("change", "sources"))
   expect_true(nrow(variants) >= 1)
+})
+
+test_that("protvar_strip_citations() drops evidence, keeps the prose", {
+  # The real TP53 shape: a citation group closing the sentence.
+  expect_identical(
+    protvar_strip_citations(
+      "Induces cell cycle arrest (PubMed:11025664, PubMed:12524540)."
+    ),
+    "Induces cell cycle arrest."
+  )
+  # Mixed parenthetical: the note survives, the citation goes.
+  expect_identical(
+    protvar_strip_citations("Binds DNA (By similarity, PubMed:9840937)."),
+    "Binds DNA (By similarity)."
+  )
+  # Several groups across a longer passage.
+  stripped <- protvar_strip_citations(paste(
+    "Acts as a tumor suppressor (PubMed:11025664, PubMed:12524540).",
+    "Regulates the circadian clock (PubMed:24051492)"
+  ))
+  expect_no_match(stripped, "PubMed")
+  expect_match(stripped, "tumor suppressor\\.")
+  expect_match(stripped, "circadian clock$")
+
+  # Nothing to strip, and blank input, both pass through untouched.
+  expect_identical(protvar_strip_citations("Plain text."), "Plain text.")
+  expect_true(is_blank(protvar_strip_citations(NA_character_)))
 })
 
 test_that("protvar_parse_position() pulls the residue number", {
