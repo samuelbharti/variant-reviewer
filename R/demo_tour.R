@@ -185,7 +185,14 @@ vr_demo_tour <- function() {
     padding = 6,
     allow_close = TRUE
   )
+  # Skip steps for cards that start un-ticked (their tour anchor is absent, and
+  # the demo doesn't enable them) so the walkthrough never highlights a missing
+  # element or triggers a default-off source.
+  off_anchors <- paste0("tour_", .dashboard_cards_default_off)
   for (s in .vr_demo_steps) {
+    if (s$el %in% off_anchors) {
+      next
+    }
     # Every card (and the chat panel) is highlighted by its header only, so the
     # spotlight stays compact; the search box has no header, so it's highlighted
     # whole (showing the filled inputs and the Review button).
