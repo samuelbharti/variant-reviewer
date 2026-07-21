@@ -56,11 +56,39 @@
 .byok_chat_provider_models <- function(provider) {
   switch(
     provider,
-    gemini = c("gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"),
+    gemini = c(
+      "gemini-flash-lite-latest",
+      "gemini-flash-latest",
+      "gemini-2.5-flash",
+      "gemini-2.5-pro"
+    ),
     openai = c("gpt-4.1", "gpt-4o", "gpt-4o-mini"),
     anthropic = c("claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5"),
     character(0)
   )
+}
+
+# The model preselected for a provider. "" means "leave the picker empty and let
+# the backend use the provider's own default". Gemini defaults to the cheapest
+# fast tier, which is plenty for summarizing the dashboard's cards.
+.byok_chat_provider_default_model <- function(provider) {
+  switch(
+    provider,
+    gemini = "gemini-flash-lite-latest",
+    ""
+  )
+}
+
+# Keep the provider default selectable (and selected) even when the live model
+# list comes back without it, so the picker never silently drops the default.
+.byok_chat_with_default <- function(ids, default) {
+  if (!nzchar(default %||% "")) {
+    return(ids)
+  }
+  if (default %in% ids) {
+    return(c(default, setdiff(ids, default)))
+  }
+  c(default, ids)
 }
 
 # The ellmer constructor for a provider (looked up only on the enabled path, so
@@ -91,7 +119,7 @@
 # never offers a stale or unavailable model. Returns a character vector, or NULL
 # on any failure (bad key, offline, unexpected shape) so the caller falls back
 # to the curated suggestions. The provider endpoints are lightweight; the call
-# is user-initiated (a button), and any error degrades to the fallback.
+# is debounced behind key entry, and any error degrades to the fallback.
 .byok_chat_fetch_models <- function(provider, api_key) {
   fn <- .byok_chat_lister(provider)
   if (is.null(fn) || !nzchar(api_key %||% "")) {
@@ -360,7 +388,7 @@ byok_chat_ui <- function(
     passwordInput(
       ns("api_key"),
       "API key",
-      placeholder = "Paste your key (kept in this session only)",
+      placeholder = "Paste your key — models load automatically",
       width = "100%"
     ),
     # Model picker: choose a suggested model or type any id the key supports
@@ -382,24 +410,12 @@ byok_chat_ui <- function(
       class = "text-muted small mb-2",
       "Not listed? Type any model id your key supports and press Enter."
     ),
-    # Pull the CURRENT, key-scoped model list from the provider so the picker
-    # never offers a stale or inaccessible model.
-    if (isTRUE(list_models)) {
-      actionButton(
-        ns("refresh_models"),
-        "List models for this key",
-        class = "btn-outline-secondary btn-sm mb-1"
-      )
-    },
+    # Status line for the key-scoped model list, which loads on its own as soon
+    # as a key is entered (see the server) rather than behind a button.
     if (isTRUE(list_models)) uiOutput(ns("model_source")),
     div(
       class = "d-flex gap-2 mb-2",
-      actionButton(ns("connect"), "Connect", class = "btn-primary btn-sm"),
-      actionButton(
-        ns("forget"),
-        "Forget key",
-        class = "btn-outline-secondary btn-sm"
-      )
+      actionButton(ns("connect"), "Connect", class = "btn-primary btn-sm")
     ),
     uiOutput(ns("cred_status")),
     tags$p(
@@ -611,7 +627,7 @@ byok_chat_server <- function(
     # The active key, held only to redact it from any surfaced error. "" before
     # a key is connected.
     active_secret <- reactiveVal("")
-    # Note shown under the "List models" button (fallback vs. live-loaded count).
+    # Note shown under the model picker (fallback vs. live-loaded count).
     model_note <- reactiveVal(NULL)
 
     # Live model lister -- injectable so tests avoid the network. Defaults to the
@@ -640,60 +656,40 @@ byok_chat_server <- function(
       }
     }
 
-    # React to the provider selector: reset the conversation and repopulate the
-    # model picker with this provider's suggestions.
-    observeEvent(input$provider, {
-      prov <- input$provider
-      if (is.null(prov) || !nzchar(prov)) {
-        return()
-      }
-      client(NULL)
-      active_secret("")
-      do_clear()
-      updateSelectizeInput(
-        session,
-        "model",
-        choices = .byok_chat_provider_models(prov),
-        selected = character(0),
-        server = FALSE
-      )
-      model_note(NULL)
-      status(list(ok = FALSE, msg = disconnected_msg(prov)))
-    })
-
     # Fetch the provider's live, key-scoped model list and repopulate the picker.
-    # Keeps whatever the user already typed selected; on failure we keep the
-    # curated fallback and say so, so this can never strand the user.
-    observeEvent(input$refresh_models, {
-      prov <- input$provider
-      if (is.null(prov) || !nzchar(prov)) {
-        return()
+    # Keeps whatever the user already typed selected, otherwise falls back to the
+    # provider default; on failure we keep the curated suggestions and say so, so
+    # this can never strand the user.
+    refresh_models <- function(prov, key) {
+      if (!isTRUE(list_models)) {
+        return(invisible(NULL))
       }
-      key <- trimws(input$api_key %||% "")
-      if (!nzchar(key)) {
-        key <- .byok_chat_env_first(.byok_chat_provider_meta(prov)$env)
+      if (is.null(prov) || !nzchar(prov) || !nzchar(key %||% "")) {
+        return(invisible(NULL))
       }
-      if (!nzchar(key)) {
-        model_note(list(
-          ok = FALSE,
-          msg = "Enter a key first to list its models."
-        ))
-        return()
-      }
-      model_note(list(ok = FALSE, msg = "Fetching models..."))
+      model_note(list(ok = FALSE, msg = "Loading models for this key..."))
       ids <- tryCatch(lister(prov, key), error = function(e) NULL)
       if (is.null(ids) || length(ids) == 0) {
         model_note(list(
           ok = FALSE,
-          msg = "Couldn't fetch models for this key -- showing suggestions. Type an id if needed."
+          msg = "Couldn't load models for this key -- showing suggestions. Type an id if needed."
         ))
-        return()
+        return(invisible(NULL))
       }
+      default <- .byok_chat_provider_default_model(prov)
+      ids <- .byok_chat_with_default(ids, default)
+      keep <- trimws(isolate(input$model) %||% "")
       updateSelectizeInput(
         session,
         "model",
         choices = ids,
-        selected = isolate(trimws(input$model %||% "")),
+        selected = if (nzchar(keep)) {
+          keep
+        } else if (nzchar(default)) {
+          default
+        } else {
+          character(0)
+        },
         server = FALSE
       )
       model_note(list(
@@ -705,6 +701,44 @@ byok_chat_server <- function(
           "."
         )
       ))
+    }
+
+    # React to the provider selector: reset the conversation, repopulate the
+    # model picker with this provider's suggestions (preselecting its default),
+    # and load the live list when a key is already available.
+    observeEvent(input$provider, {
+      prov <- input$provider
+      if (is.null(prov) || !nzchar(prov)) {
+        return()
+      }
+      client(NULL)
+      active_secret("")
+      do_clear()
+      default <- .byok_chat_provider_default_model(prov)
+      updateSelectizeInput(
+        session,
+        "model",
+        choices = .byok_chat_with_default(
+          .byok_chat_provider_models(prov),
+          default
+        ),
+        selected = if (nzchar(default)) default else character(0),
+        server = FALSE
+      )
+      model_note(NULL)
+      status(list(ok = FALSE, msg = disconnected_msg(prov)))
+      key <- trimws(input$api_key %||% "")
+      if (!nzchar(key)) {
+        key <- .byok_chat_env_first(.byok_chat_provider_meta(prov)$env)
+      }
+      refresh_models(prov, key)
+    })
+
+    # Pasting (or typing) a key loads that key's models on its own -- there is no
+    # button. Debounced so a paste, or a burst of keystrokes, costs one lookup.
+    key_typed <- debounce(reactive(trimws(input$api_key %||% "")), 600)
+    observeEvent(key_typed(), {
+      refresh_models(isolate(input$provider), key_typed())
     })
 
     observeEvent(input$connect, {
@@ -758,18 +792,6 @@ byok_chat_server <- function(
           suggestions
         ))
       }
-    })
-
-    observeEvent(input$forget, {
-      client(NULL)
-      active_secret("")
-      updateTextInput(session, "api_key", value = "")
-      msg <- paste("Key forgotten.", disconnected_msg(input$provider))
-      status(list(ok = FALSE, msg = msg))
-      do_clear()
-      # Drop the example-prompt greeting so it doesn't invite clicks that can't
-      # run while disconnected; nudge the user to reconnect instead.
-      .byok_chat_set_greeting(msg)
     })
 
     observeEvent(input$chat_user_input, {
