@@ -65,7 +65,7 @@
   list(
     "Disease associations",
     "Open Targets",
-    "Gene–disease association evidence."
+    "Gene-disease association evidence."
   ),
   list(
     "External links",
@@ -95,11 +95,12 @@ about_page <- tagList(
       card_body(
         tags$p(
           "Variant Reviewer is a lightweight gene and variant interpretation ",
-          "companion. Enter a gene symbol — and, optionally, a variant (the box ",
-          "suggests the gene's known pathogenic variants as you type) — to ",
-          "pull together, on a single dashboard, what the gene does, where it ",
-          "is expressed, what it interacts with, and protein- and ",
-          "clinical-level context for the variant."
+          "companion. Enter a gene symbol, a variant, or both (the box ",
+          "suggests the gene's known pathogenic variants as you type). A ",
+          "variant on its own resolves its gene, so the dashboard pulls ",
+          "together, in one place, what the gene does, where it is expressed, ",
+          "what it interacts with, and protein- and clinical-level context for ",
+          "the variant."
         ),
         tags$p(
           class = "mb-0",
@@ -123,7 +124,7 @@ about_page <- tagList(
             tags$ul(
               class = "mb-0",
               tags$li(
-                "Reviews one human gene and, optionally, one variant at a time."
+                "Reviews one human gene, one variant, or both at a time."
               ),
               tags$li(
                 "Aggregates public annotations, read-only, onto one dashboard."
@@ -192,7 +193,7 @@ about_page <- tagList(
           ),
           " package, using its offline ",
           tags$em("pattern"),
-          " mode — a fast, reproducible, network-free grammar check. Gene ",
+          " mode: a fast, reproducible, network-free grammar check. Gene ",
           "symbols are checked against the HGNC symbol grammar and rsIDs against ",
           "the dbSNP grammar; other variant forms (HGVS, protein shorthand such ",
           "as R175H) are passed through for the annotation API to resolve."
@@ -200,7 +201,7 @@ about_page <- tagList(
         tags$p(
           class = "mb-0",
           "Malformed input is rejected up front with an inline message, so no ",
-          "lookup is ever fired on an obviously-bad identifier — this applies ",
+          "lookup is ever fired on an obviously bad identifier. This applies ",
           "both to what you type and to what the assistant loads. It is a ",
           "format check, not an existence check: whether the identifier actually ",
           "exists is confirmed by the resolving services (MyGene, MyVariant)."

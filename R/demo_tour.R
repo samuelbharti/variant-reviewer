@@ -30,7 +30,7 @@
     el = "tour_variant_summary",
     title = "Variant",
     description = paste(
-      "The variant's annotation — dbSNP, clinical significance, and scores",
+      "The variant's annotation: dbSNP, clinical significance, and scores",
       "(MyVariant)."
     )
   ),
@@ -42,7 +42,7 @@
   list(
     el = "tour_gnomad",
     title = "gnomAD",
-    description = "Population allele frequencies — how common the variant is."
+    description = "Population allele frequencies: how common the variant is."
   ),
   list(
     el = "tour_protein_summary",
@@ -54,8 +54,8 @@
     title = "Variant landscape",
     description = paste(
       "Every ClinVar variant placed along the protein (coloured by",
-      "significance) over the domain track — see if the variant sits in a",
-      "hotspot."
+      "significance) over the domain track, so you can see if the variant sits",
+      "in a hotspot."
     )
   ),
   list(
@@ -149,15 +149,15 @@ vr_demo_modal <- function(example_label) {
     tags$ul(
       tags$li(
         tags$strong("Gene / Variant / Protein"),
-        " — identity, annotation, and protein context."
+        ": identity, annotation, and protein context."
       ),
       tags$li(
         tags$strong("ClinVar / gnomAD / Consequences"),
-        " — clinical significance, population frequency, predicted effect."
+        ": clinical significance, population frequency, predicted effect."
       ),
       tags$li(
         tags$strong("Expression / Interactions / Diseases"),
-        " — GTEx tissue expression, STRING partners, Open Targets associations."
+        ": GTEx tissue expression, STRING partners, Open Targets associations."
       )
     ),
     tags$hr(),
@@ -165,7 +165,7 @@ vr_demo_modal <- function(example_label) {
     tags$ol(
       tags$li("Open ", tags$strong("Model & key"), " on the chat panel."),
       tags$li(
-        "Connect a provider — an environment key is used automatically,",
+        "Connect a provider. An environment key is used automatically,",
         " otherwise paste your own (kept only in this session)."
       ),
       tags$li(

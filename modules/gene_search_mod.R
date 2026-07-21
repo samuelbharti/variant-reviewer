@@ -139,7 +139,7 @@ gene_search_server <- function(id, requested = reactiveVal(NULL)) {
       tags$div(
         class = "small text-muted mt-1",
         sprintf(
-          "%d known pathogenic/likely-pathogenic variant%s for %s — type to filter, or enter any rsID/HGVS.",
+          "%d known pathogenic/likely-pathogenic variant%s for %s. Type to filter, or enter any rsID/HGVS.",
           n,
           if (n == 1) "" else "s",
           trimws(input$gene %||% "")

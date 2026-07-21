@@ -173,7 +173,7 @@ vr_http_error_message <- function(
     return(paste0(
       "Couldn't reach ",
       source,
-      " — please check your internet connection and try again."
+      ". Please check your internet connection and try again."
     ))
   }
   paste0(source, " is temporarily unavailable. Please try again shortly.")

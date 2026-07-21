@@ -99,7 +99,10 @@ protein_variants_ui <- function(variants) {
         tags$li(
           tags$strong(variants$change[i]),
           if (!is_blank(variants$sources[i])) {
-            tags$span(class = "text-muted", paste0(" — ", variants$sources[i]))
+            tags$span(
+              class = "text-muted",
+              paste0(" (", variants$sources[i], ")")
+            )
           }
         )
       })
