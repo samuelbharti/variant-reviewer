@@ -7,10 +7,25 @@ protein_structure_ui <- function(id) {
   card(
     full_screen = TRUE,
     vr_card_header("3D structure (AlphaFold)", ns),
-    card_body(shinycssloaders::withSpinner(
-      uiOutput(ns("content")),
-      proxy.height = "360px"
-    ))
+    card_body(
+      # The viewer lives in the UI permanently instead of being rebuilt by a
+      # renderUI on every search. An htmlwidget re-created that way comes back as
+      # a fresh, empty element, and the value the server already sent has nowhere
+      # to land -- which is why the structure only ever appeared on the first
+      # search. Keeping one element and swapping its contents avoids that
+      # entirely. conditionalPanel only toggles display, so the node (and its
+      # WebGL context) survives; suspendWhenHidden = FALSE in the server keeps it
+      # rendering while hidden so it is ready the moment it is shown again.
+      shinycssloaders::withSpinner(
+        uiOutput(ns("status")),
+        proxy.height = "40px"
+      ),
+      conditionalPanel(
+        condition = sprintf("output['%s']", ns("has_model")),
+        r3dmol::r3dmolOutput(ns("viewer"), height = "360px"),
+        uiOutput(ns("note"))
+      )
+    )
   )
 }
 
@@ -44,10 +59,28 @@ protein_structure_server <- function(id, resolved, search, annotation) {
       out
     })
 
+    # The coordinate download, kept separate from `meta` so a model that exists
+    # but whose file won't download reports that instead of blanking the card.
+    coords <- reactive({
+      info <- meta()
+      if (is.null(info) || !isTRUE(info$ok)) {
+        return(NULL)
+      }
+      alphafold_pdb_text(info$pdb_url)
+    })
+
+    # Drives the conditionalPanel wrapping the viewer. Kept alive while hidden so
+    # the widget renders in the background and is ready when the card reappears.
+    output$has_model <- reactive({
+      pdb <- coords()
+      !is.null(pdb) && isTRUE(pdb$ok)
+    })
+    outputOptions(output, "has_model", suspendWhenHidden = FALSE)
+
     output$viewer <- r3dmol::renderR3dmol({
       info <- meta()
       req(info, isTRUE(info$ok))
-      pdb <- alphafold_pdb_text(info$pdb_url)
+      pdb <- coords()
       req(isTRUE(pdb$ok))
       viewer <- r3dmol::r3dmol(backgroundColor = "#faf8f3") |>
         r3dmol::m_add_model(data = pdb$text, format = "pdb") |>
@@ -70,6 +103,10 @@ protein_structure_server <- function(id, resolved, search, annotation) {
       }
       viewer
     })
+    # Set after the output exists (outputOptions errors otherwise). Keeping the
+    # viewer unsuspended while its conditionalPanel is hidden means it re-renders
+    # in place on a new search instead of waiting to be shown.
+    outputOptions(output, "viewer", suspendWhenHidden = FALSE)
 
     output$source <- renderUI({
       info <- meta()
@@ -77,7 +114,9 @@ protein_structure_server <- function(id, resolved, search, annotation) {
       vr_source_link(src_alphafold(info$accession), "AlphaFold")
     })
 
-    output$content <- renderUI({
+    # Only the messages: nothing here builds the viewer, so the widget element is
+    # never torn down and rebuilt.
+    output$status <- renderUI({
       info <- meta()
       if (is.null(info)) {
         return(vr_empty("Search for a gene to see its predicted 3D structure."))
@@ -85,6 +124,21 @@ protein_structure_server <- function(id, resolved, search, annotation) {
       if (!isTRUE(info$ok)) {
         return(vr_error(info$error))
       }
+      pdb <- coords()
+      # The model exists but its coordinates would not download -- say so rather
+      # than leaving an empty card with no explanation.
+      if (!is.null(pdb) && !isTRUE(pdb$ok)) {
+        return(vr_error(
+          pdb$error %||%
+            "Could not download the structure coordinates from AlphaFold."
+        ))
+      }
+      NULL
+    })
+
+    output$note <- renderUI({
+      info <- meta()
+      req(info, isTRUE(info$ok))
       pos <- info$position
       note <- if (!is.null(pos) && !is.na(suppressWarnings(as.integer(pos)))) {
         sprintf(
@@ -95,13 +149,10 @@ protein_structure_server <- function(id, resolved, search, annotation) {
       } else {
         sprintf("AlphaFold model for %s.", info$accession)
       }
-      tagList(
-        r3dmol::r3dmolOutput(ns("viewer"), height = "360px"),
-        tags$p(
-          class = "text-muted small mb-0 mt-2",
-          note,
-          " Predicted (computed) structure from AlphaFold DB, not experimental."
-        )
+      tags$p(
+        class = "text-muted small mb-0 mt-2",
+        note,
+        " Predicted (computed) structure from AlphaFold DB, not experimental."
       )
     })
 
