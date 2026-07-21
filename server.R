@@ -1,7 +1,12 @@
 # Shiny Server
 function(input, output, session) {
+  # Search requested by the assistant. The search module fills its inputs from
+  # this and runs its own submit, so the assistant drives the search box rather
+  # than writing the query (or any card) itself.
+  assistant_search <- reactiveVal(NULL)
+
   # Submitted search query: reactive(list(gene, variant)) or NULL.
-  search <- gene_search_server("search")
+  search <- gene_search_server("search", requested = assistant_search)
 
   # Resolve the gene once and share its identifiers with every gene-level
   # module (summary, GTEx, STRING, protein, links).
@@ -143,30 +148,200 @@ function(input, output, session) {
       )
     }
   })
-  observe(dash$gene <- resolved())
-  observe(dash$variant <- variant_annotation())
-  observe(dash$predictions <- predictions_data())
-  observe(dash$protein <- protein_data())
-  observe(dash$domains <- domains_data())
-  observe(dash$structure <- structure_data())
-  observe(dash$clinvar <- clinvar_data())
-  observe(dash$gnomad <- gnomad_data())
-  observe(dash$constraint <- constraint_data())
-  observe(dash$consequences <- ensembl_data())
-  observe(dash$expression <- gtex_data())
-  observe(dash$interactions <- string_data())
-  observe(dash$diseases <- opentargets_data())
-  observe(dash$landscape <- landscape_data())
-  observe(dash$conservation <- conservation_data())
-  observe(dash$genemodel <- genemodel_data())
+  # Every source in the dashboard, in the order they are fetched. `variant` marks
+  # the ones that need a variant as well as a gene -- a gene-only search skips
+  # them, so they are left out of the progress total rather than counted and
+  # never reached. `label` is what the progress popup names as it works through
+  # them.
+  sources <- list(
+    list(id = "gene", label = "MyGene", variant = FALSE, get = resolved),
+    list(
+      id = "constraint",
+      label = "gnomAD constraint",
+      variant = FALSE,
+      get = constraint_data
+    ),
+    list(
+      id = "landscape",
+      label = "ClinVar landscape",
+      variant = FALSE,
+      get = landscape_data
+    ),
+    list(
+      id = "domains",
+      label = "UniProt domains",
+      variant = FALSE,
+      get = domains_data
+    ),
+    list(
+      id = "structure",
+      label = "AlphaFold structure",
+      variant = FALSE,
+      get = structure_data
+    ),
+    list(
+      id = "expression",
+      label = "GTEx expression",
+      variant = FALSE,
+      get = gtex_data
+    ),
+    list(
+      id = "interactions",
+      label = "STRING interactions",
+      variant = FALSE,
+      get = string_data
+    ),
+    list(
+      id = "diseases",
+      label = "Open Targets diseases",
+      variant = FALSE,
+      get = opentargets_data
+    ),
+    list(
+      id = "variant",
+      label = "MyVariant annotation",
+      variant = TRUE,
+      get = variant_annotation
+    ),
+    list(
+      id = "predictions",
+      label = "In-silico predictions",
+      variant = TRUE,
+      get = predictions_data
+    ),
+    list(
+      id = "protein",
+      label = "ProtVar protein context",
+      variant = TRUE,
+      get = protein_data
+    ),
+    list(
+      id = "clinvar",
+      label = "ClinVar significance",
+      variant = TRUE,
+      get = clinvar_data
+    ),
+    list(
+      id = "gnomad",
+      label = "gnomAD frequency",
+      variant = TRUE,
+      get = gnomad_data
+    ),
+    list(
+      id = "consequences",
+      label = "Ensembl VEP",
+      variant = TRUE,
+      get = ensembl_data
+    ),
+    list(
+      id = "conservation",
+      label = "Conservation scores",
+      variant = TRUE,
+      get = conservation_data
+    ),
+    # Reads the gnomAD result for the variant position, so it comes last.
+    list(
+      id = "genemodel",
+      label = "Ensembl gene model",
+      variant = FALSE,
+      get = genemodel_data
+    )
+  )
 
-  # Load a gene/variant into the dashboard on the assistant's behalf: update the
-  # (namespaced) search inputs and set the shared query, which drives the whole
-  # pipeline. Runs the app's own lookups — the assistant never fetches directly.
+  # Fetching is synchronous, so the R process is busy for the whole search and
+  # cannot flush outputs until it is done -- which is why the cards arrive in a
+  # couple of clumps rather than one by one. shiny::Progress is the exception:
+  # it writes straight to the websocket instead of waiting for the flush cycle,
+  # so the count below advances while the fetches are still running.
+  #
+  # This has to be ONE observer rather than one per source. Whichever consumer
+  # touches a reactive first is the one that pays for its fetch, so if the card
+  # outputs got there first they would do all the waiting and this loop would
+  # only ever report an instant 16/16. Running it as a single high-priority
+  # observer makes it the first thing to touch them, which is what keeps the
+  # order, and therefore the count, honest.
+  # Which card each source feeds. Unticking a card in the Cards popover hides it
+  # client-side, which suspends its outputs so they never compute -- the only
+  # reason a hidden card still cost an API call was this loop forcing its
+  # reactive. Skipping it here is what turns the toggle into "don't fetch"
+  # rather than "fetch and don't show".
+  source_card <- c(
+    gene = "gene_summary",
+    constraint = "constraint",
+    landscape = "landscape",
+    domains = "domains",
+    structure = "structure",
+    expression = "gtex",
+    interactions = "string_ppi",
+    diseases = "opentargets",
+    variant = "variant_summary",
+    predictions = "predictions",
+    protein = "protein_summary",
+    clinvar = "clinvar",
+    gnomad = "gnomad",
+    consequences = "ensembl",
+    conservation = "conservation",
+    genemodel = "genemodel"
+  )
+
+  observe(
+    {
+      query <- search()
+      shown <- input$visible_cards %||% names(.dashboard_cards)
+      # A source is fetched when its card is on screen and the query can
+      # actually answer it (variant-level sources need a variant).
+      applies <- function(src) {
+        has_variant <- !is.null(query) && !is_blank(query$variant)
+        (!src$variant || has_variant) && source_card[[src$id]] %in% shown
+      }
+      total <- length(Filter(applies, sources))
+
+      bar <- NULL
+      if (!is.null(query) && total > 0) {
+        bar <- Progress$new(session, min = 0, max = total)
+        on.exit(bar$close(), add = TRUE)
+      }
+
+      done <- 0L
+      for (src in sources) {
+        if (!applies(src)) {
+          # Leave no stale value behind for the assistant to read as current.
+          dash[[src$id]] <- NULL
+          next
+        }
+        if (!is.null(bar)) {
+          bar$set(
+            value = done,
+            message = sprintf("Loading sources (%d of %d)", done, total),
+            detail = src$label
+          )
+        }
+        # Forcing the reactive here is what triggers the fetch; the card outputs
+        # then render from the cached value.
+        dash[[src$id]] <- src$get()
+        done <- done + 1L
+      }
+
+      if (!is.null(bar)) {
+        bar$set(
+          value = total,
+          message = sprintf("Loaded %d of %d sources", total, total),
+          detail = "Done"
+        )
+      }
+    },
+    priority = 100
+  )
+
+  # The assistant's only way to change the dashboard: type a gene/variant into
+  # the search box and click Review. It hands the request to the search module,
+  # which fills its inputs and submits; the cards then update as they would for
+  # any search. The assistant never writes card state and never fetches directly.
+  search_counter <- reactiveVal(0L)
   load_selection <- function(gene, variant = NULL) {
     gene <- trimws(as.character(gene %||% ""))
     if (!nzchar(gene)) {
-      return("No gene provided; nothing was loaded.")
+      return("No gene provided; nothing was searched.")
     }
     variant <- trimws(as.character(variant %||% ""))
     # Same format-level gate the search box uses, so the assistant can't fire
@@ -174,30 +349,21 @@ function(input, output, session) {
     check <- vr_validate_query(gene, if (nzchar(variant)) variant else NULL)
     if (!isTRUE(check$ok)) {
       return(paste0(
-        "Nothing was loaded — invalid input: ",
+        "Nothing was searched — invalid input: ",
         paste(check$errors, collapse = " ")
       ))
     }
-    updateTextInput(session, "search-gene", value = gene)
-    # The variant control is a selectize; set it via choices + selected so an
-    # assistant-supplied rsID/HGVS shows even if it isn't a suggested option.
-    updateSelectizeInput(
-      session,
-      "search-variant",
-      choices = if (nzchar(variant)) {
-        stats::setNames(variant, variant)
-      } else {
-        character()
-      },
-      selected = variant,
-      server = FALSE
-    )
-    search(list(gene = gene, variant = if (nzchar(variant)) variant else NULL))
+    search_counter(search_counter() + 1L)
+    assistant_search(list(
+      gene = gene,
+      variant = if (nzchar(variant)) variant else NULL,
+      nonce = search_counter()
+    ))
     paste0(
-      "Loading ",
+      "Searched ",
       gene,
       if (nzchar(variant)) paste0(" / ", variant) else "",
-      " into the dashboard. The cards are refreshing; read them (read_card) to",
+      " in the search box. The cards are refreshing; read them (read_card) to",
       " see the results."
     )
   }
@@ -272,10 +438,11 @@ function(input, output, session) {
       ellmer::tool(
         function(gene, variant = NULL) load_selection(gene, variant),
         paste(
-          "Load a human gene (and optional variant) into the dashboard, running",
-          "the app's own lookups so every card populates. Use this to pull up a",
-          "gene/variant for the user. Do not perform your own external",
-          "searches — always load through this tool and read the cards."
+          "Type a human gene (and optional variant) into the app's search box",
+          "and click Review, exactly as the user would. The app runs its own",
+          "lookups and the cards refresh on their own. This is the only way you",
+          "can change the dashboard — you cannot write to a card. Do not perform",
+          "your own external searches; always search here and read the cards."
         ),
         arguments = list(
           gene = ellmer::type_string("Human gene symbol, e.g. TP53 or BRAF."),
@@ -307,9 +474,12 @@ function(input, output, session) {
       "use get_current_selection to see what gene/variant is loaded; use",
       "read_card to read what a specific card shows (gene, variant, protein,",
       "clinvar, gnomad, consequences, expression, interactions, diseases); and",
-      "use set_selection to load a gene/variant into the dashboard for the user.",
-      "After set_selection, the cards refresh asynchronously — read them again",
-      "(read_card) on the next exchange to report results.",
+      "use set_selection to type a gene/variant into the search box and click",
+      "Review for the user. Reading is unrestricted; searching is the ONLY",
+      "change you can make. You cannot write to a card or edit what one shows —",
+      "the app fills the cards itself from the search. After set_selection the",
+      "cards refresh asynchronously, so read them again (read_card) on the next",
+      "exchange to report results.",
       "",
       "OUT OF SCOPE — politely decline and steer back on topic if asked for",
       "anything unrelated to genomics or variant interpretation. You do not",
