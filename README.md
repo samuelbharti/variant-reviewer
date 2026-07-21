@@ -155,9 +155,12 @@ for discussing the gene or variant you're reviewing. It is **bring your own key
 (BYOK)**: open the chat's **Model & key** drawer (the gear button in the chat
 header), pick a provider (Google Gemini, OpenAI, or Anthropic), and paste your
 own API key, which is held only in your session's server memory and never
-written to disk. Alternatively, set a server-side key via the
-matching environment variable (`GEMINI_API_KEY` / `GOOGLE_API_KEY`,
-`OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`) and connect with the key field blank.
+written to disk. Pasting the key loads the models that key can actually reach,
+so the picker fills in on its own; you can still type any model id the key
+supports. Gemini starts on `gemini-flash-lite-latest`. Alternatively, set a
+server-side key via the matching environment variable (`GEMINI_API_KEY` /
+`GOOGLE_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`) and connect with the
+key field blank.
 
 The assistant is grounded in the dashboard through app-scoped tools (wired in
 [server.R](server.R), formatters in [R/chat_tools.R](R/chat_tools.R)):
@@ -166,8 +169,14 @@ The assistant is grounded in the dashboard through app-scoped tools (wired in
 - `read_card` — the data shown in a specific card (gene, variant, predictions,
   protein, domains, structure, clinvar, gnomad, constraint, consequences,
   expression, interactions, diseases).
-- `set_selection` — load a gene (and optional variant) into the dashboard,
-  running the app's own lookups.
+- `set_selection` — type a gene (and optional variant) into the search box and
+  click Review, exactly as you would.
+
+Reading is unrestricted, but searching is the only change the assistant can
+make: `set_selection` drives the search box and the app fills the cards itself,
+so the assistant cannot write to a card or edit what one shows. The request goes
+through the same validation as a typed search, and the gene/variant it used
+stays visible in the search box.
 
 It works through the app's data and lookups rather than searching externally. It
 requires the `ellmer` and `shinychat` packages; if they are absent the card

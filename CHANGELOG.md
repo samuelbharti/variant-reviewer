@@ -4,6 +4,52 @@ All notable changes to this project should be documented in this file.
 
 ## [Unreleased]
 
+- Fixed the 3D structure only appearing on the first search. The viewer was
+  rebuilt by a `renderUI` every time, and an htmlwidget re-created that way comes
+  back empty with the server's value already sent and nowhere to land. The
+  element now lives in the UI permanently and only its contents change.
+- Unticking a card in the **Cards** popover now skips its API call instead of
+  just hiding the result. Hidden cards were already suspended by Shiny; the only
+  thing still fetching them was the loop that mirrors results for the assistant.
+  The progress total follows suit, so a search with cards hidden reports fewer
+  sources.
+- The 3D structure card now reports a coordinate download that fails, instead of
+  silently rendering an empty viewer.
+- Bounded the API cache and made it tunable. It now has entry and byte ceilings
+  with least-recently-used eviction, so a long-running server cannot grow without
+  limit, and `VR_CACHE_TTL` / `VR_CACHE_MAX_SIZE` / `VR_CACHE_MAX_N` override the
+  defaults. Added `vr_cache_stats()` and `vr_cache_clear()`.
+- Widened the assistant column to a fixed 460px track on wide screens, and
+  render the example prompts as a bullet list instead of shinychat's card grid.
+  That grid sizes its tracks from a minimum card width, which in a column this
+  narrow came out wider than the column and left a horizontal scrollbar; a plain
+  list has no minimum, so it wraps. The prompts stay clickable.
+- Added a search progress popup (bottom right) that counts the data sources as
+  they load — "Loading sources (7 of 16)" plus the one being fetched. The total
+  reflects the search: a gene-only search skips the seven variant-level sources
+  and counts 9. Fetching is synchronous, so the R process cannot flush outputs
+  mid-search and the cards arrive in clumps; `shiny::Progress` is used because it
+  writes straight to the websocket instead of waiting for the flush cycle. The
+  sources are driven from one high-priority observer so it is the first consumer
+  to touch each reactive, which is what keeps the count honest.
+- Stripped the inline UniProt citations from the ProtVar **Function** text. The
+  TP53 entry carried more `PubMed:` ids than prose; non-citation notes such as
+  "(By similarity)" are kept.
+- Simplified the assistant's **Model & key** drawer: pasting an API key now
+  loads that key's models on its own, so the "List models for this key" button
+  is gone. The "Forget key" button is gone too — switching provider already
+  clears the client and starts a fresh conversation. Gemini now starts on
+  `gemini-flash-lite-latest`, and the provider default stays selectable even
+  when the live list comes back without it.
+- Limited the assistant to the search box. `set_selection` now fills the gene /
+  variant inputs and runs the same submit as a **Review** click, instead of
+  writing the query behind the search module's back. Reading cards is
+  unchanged; the assistant cannot write card state, and its request gets the
+  same validation and visible search box as a typed one.
+- Fixed the assistant column changing width as the conversation grew. It sits in
+  a bslib fill container (a column flexbox), where `align-self` controls the
+  horizontal axis, so `align-self: start` shrink-wrapped it to its content — the
+  column resized whenever the greeting's suggestion cards gave way to a reply.
 - Added four visualization cards: a **Variant landscape** protein "lollipop"
   (every ClinVar variant placed at its residue, coloured by significance, over
   the UniProt domain track, with the queried variant marked); a **Conservation**
