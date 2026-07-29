@@ -63,6 +63,6 @@ repos:
     hooks:
       - id: codespell
         args: ["--ignore-words-list=ans,fo"]
-        # Skip the generated lockfile (author/package names) and the
-        # boilerplate code of conduct.
-        exclude: "^(renv\\.lock|CODE_OF_CONDUCT\\.md)$"
+        # Skip the generated dependency files (author/package names such as
+        # "Claus" and "deSolve") and the boilerplate code of conduct.
+        exclude: "^(renv\\.lock|manifest\\.json|CODE_OF_CONDUCT\\.md)$"
