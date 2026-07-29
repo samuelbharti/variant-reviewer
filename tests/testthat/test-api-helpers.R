@@ -82,6 +82,32 @@ test_that("the cache is bounded and reports what it holds", {
   expect_identical(vr_cache_stats()$entries, 0L)
 })
 
+test_that("vr_seed_demo_cache() seeds entries from a snapshot", {
+  vr_cache_clear()
+
+  snap <- file.path(tempdir(), "demo_cache_test.rds")
+  on.exit(unlink(snap), add = TRUE)
+  saveRDS(
+    list(
+      "key-a" = list(ok = TRUE, data = 1),
+      "key-b" = list(ok = TRUE, data = 2)
+    ),
+    snap
+  )
+
+  expect_identical(vr_seed_demo_cache(snap), 2L)
+  expect_identical(vr_cache$get("key-a")$data, 1)
+  expect_identical(vr_cache$get("key-b")$data, 2)
+
+  vr_cache_clear()
+})
+
+test_that("vr_seed_demo_cache() is a no-op when the snapshot is missing", {
+  vr_cache_clear()
+  expect_identical(vr_seed_demo_cache(file.path(tempdir(), "no-such.rds")), 0L)
+  expect_identical(vr_cache_stats()$entries, 0L)
+})
+
 test_that(".vr_env_num() falls back when a setting is blank or malformed", {
   skip_if_not_installed("withr")
   withr::local_envvar(c(VR_TEST_NUM = ""))
