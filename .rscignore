@@ -1,0 +1,28 @@
+# Secrets. rsconnect does NOT honour .gitignore, so these must be listed here or
+# a local deploy would upload the live API key inside the bundle. Set the
+# variables in the Connect Cloud dashboard instead.
+.Renviron
+.Renviron.example
+
+renv
+tests
+dev
+docs
+.github
+.Rproj.user
+rsconnect
+.git
+.claude
+plans
+skills
+CHANGELOG.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+Dockerfile
+.dockerignore
+.pre-commit-config.yaml
+air.toml
+template.yml
+.lintr
+.markdownlint.json
+.markdownlintignore
