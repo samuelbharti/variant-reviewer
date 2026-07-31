@@ -23,7 +23,8 @@ VR_CHAT_CARDS <- c(
   interactions = "Protein interactions (STRING)",
   diseases = "Disease associations (Open Targets)",
   phenotypes = "Phenotypes (HPO / Monarch)",
-  drugs = "Known drugs (Open Targets)"
+  drugs = "Known drugs (Open Targets)",
+  pharmacogenomics = "Pharmacogenomics (Open Targets)"
 )
 
 # Example prompts offered to the user (names are the short chip/card headings;
@@ -464,6 +465,36 @@ vr_chat_drugs <- function(res) {
   )
 }
 
+vr_chat_pharmacogenomics <- function(res) {
+  g <- .vr_card_guard(res, "No pharmacogenomics yet (needs a gene).")
+  if (!is.null(g)) {
+    return(g)
+  }
+  df <- res$data
+  if (!is.data.frame(df) || nrow(df) == 0) {
+    return("No pharmacogenomics annotations.")
+  }
+  rows <- .vr_rows(df, 8, function(i) {
+    paste0(
+      .vr_or(df$drug[i]),
+      if (!is_blank(df$rsid[i])) paste0(" @ ", df$rsid[i]) else "",
+      ": ",
+      .vr_or(df$phenotype[i]),
+      if (!is_blank(df$evidence[i])) {
+        paste0(" (evidence ", df$evidence[i], ")")
+      } else {
+        ""
+      }
+    )
+  })
+  paste0(
+    nrow(df),
+    " pharmacogenomics annotation(s). Top: ",
+    paste(rows, collapse = "; "),
+    "."
+  )
+}
+
 vr_chat_landscape <- function(res) {
   g <- .vr_card_guard(res, "No variant landscape yet (needs a gene).")
   if (!is.null(g)) {
@@ -559,6 +590,7 @@ vr_chat_card_text <- function(card, data) {
     diseases = vr_chat_diseases,
     phenotypes = vr_chat_phenotypes,
     drugs = vr_chat_drugs,
+    pharmacogenomics = vr_chat_pharmacogenomics,
     NULL
   )
   if (is.null(fn)) {

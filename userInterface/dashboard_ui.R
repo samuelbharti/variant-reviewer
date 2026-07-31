@@ -24,6 +24,7 @@
   opentargets = "Open Targets",
   phenotypes = "Phenotypes (HPO)",
   drugs = "Known drugs",
+  pharmacogenomics = "Pharmacogenomics",
   links = "External links"
 )
 
@@ -154,6 +155,10 @@ dashboard_page <- tagList(
   # better across the whole column than squeezed into a half.
   .card_when_shown("phenotypes", phenotypes_ui("phenotypes")),
   .card_when_shown("drugs", drugs_ui("drugs")),
+  .card_when_shown(
+    "pharmacogenomics",
+    pharmacogenomics_ui("pharmacogenomics")
+  ),
   .card_when_shown("links", external_links_ui("links"))
 )
 

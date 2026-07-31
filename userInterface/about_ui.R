@@ -78,6 +78,11 @@
     "Drugs and clinical candidates targeting the gene, with clinical stage."
   ),
   list(
+    "Pharmacogenomics",
+    "Open Targets",
+    "Variant and genotype effects on drug response, with evidence levels."
+  ),
+  list(
     "External links",
     "derived",
     "Deep links to external resources for the gene and variant."

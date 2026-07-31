@@ -160,6 +160,19 @@ test_that("opentargets_pretty_phase() humanizes the stage enum", {
   expect_true(is.na(opentargets_pretty_phase("")))
 })
 
+test_that("opentargets_parse_pgx() builds a variant/drug/effect data.frame", {
+  rows <- read_fixture(
+    "opentargets_pgx_cyp2c19.json"
+  )$data$target$pharmacogenomics
+  df <- opentargets_parse_pgx(rows)
+
+  expect_named(df, c("rsid", "drug", "phenotype", "genotype", "evidence"))
+  expect_equal(nrow(df), length(rows))
+  # At least one row names a drug and carries an effect description.
+  expect_true(any(!is.na(df$drug)))
+  expect_true(any(nzchar(df$phenotype)))
+})
+
 test_that("monarch_parse_items() builds an HPO id/phenotype data.frame", {
   items <- read_fixture("monarch_phenotypes_tp53.json")$items
   df <- monarch_parse_items(items)

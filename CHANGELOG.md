@@ -4,6 +4,11 @@ All notable changes to this project should be documented in this file.
 
 ## [Unreleased]
 
+- Added a **Pharmacogenomics** card: variant and genotype effects on drug
+  response for the gene (Open Targets), with an evidence level and the full
+  genotype note in an expandable row. When a variant is loaded, its matching
+  annotations are sorted to the top and called out. Readable by the assistant
+  via `read_card`.
 - Added a **Known drugs** card: the drugs and clinical candidates that target
   the gene (Open Targets), with each one's highest clinical stage and a lead
   indication, linked to its Open Targets drug page. Readable by the assistant

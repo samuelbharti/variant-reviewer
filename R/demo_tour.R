@@ -127,6 +127,14 @@
     )
   ),
   list(
+    el = "tour_pharmacogenomics",
+    title = "Pharmacogenomics",
+    description = paste(
+      "Variant and genotype effects on drug response, with an evidence level",
+      "(Open Targets)."
+    )
+  ),
+  list(
     el = "tour_links",
     title = "External links",
     description = "Jump out to the source databases for the gene and variant."

@@ -190,6 +190,100 @@ opentargets_pretty_phase <- function(x) {
   paste0(toupper(substr(s, 1, 1)), substr(s, 2, nchar(s)))
 }
 
+# Pharmacogenomics annotations for a target: variant/genotype -> drug-response
+# effect, with an evidence level. Most genes have none; a well-studied
+# pharmacogene (e.g. CYP2C19) has many.
+OPENTARGETS_PGX_QUERY <- paste(
+  "query($id: String!) {",
+  "  target(ensemblId: $id) {",
+  "    pharmacogenomics {",
+  "      variantRsId",
+  "      genotypeId",
+  "      drugs { drugFromSource }",
+  "      phenotypeText",
+  "      genotypeAnnotationText",
+  "      evidenceLevel",
+  "    }",
+  "  }",
+  "}",
+  sep = "\n"
+)
+
+# Pharmacogenomics annotations for an Ensembl gene id (target).
+# Returns:
+#   list(ok = TRUE,
+#        data = data.frame(rsid, drug, phenotype, genotype, evidence))
+#   list(ok = FALSE, error = "...")
+opentargets_pgx <- function(ensembl_id) {
+  if (is_blank(ensembl_id)) {
+    return(list(
+      ok = FALSE,
+      error = "No Ensembl gene ID available for this gene."
+    ))
+  }
+
+  res <- vr_api_post_json(
+    OPENTARGETS_URL,
+    body = list(
+      query = OPENTARGETS_PGX_QUERY,
+      variables = list(id = ensembl_id)
+    ),
+    source = "Open Targets"
+  )
+  if (!res$ok) {
+    return(list(ok = FALSE, error = res$error))
+  }
+  if (!is.null(res$data$errors)) {
+    return(list(ok = FALSE, error = "Open Targets returned a query error."))
+  }
+
+  rows <- pluck_at(res$data, "data", "target", "pharmacogenomics")
+  if (is.null(rows) || length(rows) == 0) {
+    return(list(
+      ok = FALSE,
+      error = "No pharmacogenomics annotations for this gene."
+    ))
+  }
+
+  list(ok = TRUE, data = opentargets_parse_pgx(rows))
+}
+
+# Pure parser: pharmacogenomics rows ->
+# data.frame(rsid, drug, phenotype, genotype, evidence). A row can name several
+# drugs; they are joined for display.
+opentargets_parse_pgx <- function(rows) {
+  drug_names <- function(r) {
+    drugs <- pluck_at(r, "drugs")
+    if (is.null(drugs) || length(drugs) == 0) {
+      return(NA_character_)
+    }
+    nm <- vapply(
+      drugs,
+      function(d) {
+        as.character(pluck_at(d, "drugFromSource", default = NA_character_))
+      },
+      character(1)
+    )
+    nm <- nm[!is.na(nm) & nzchar(nm)]
+    if (length(nm) == 0) NA_character_ else paste(unique(nm), collapse = ", ")
+  }
+  field <- function(name) {
+    vapply(
+      rows,
+      function(r) as.character(pluck_at(r, name, default = NA_character_)),
+      character(1)
+    )
+  }
+  data.frame(
+    rsid = field("variantRsId"),
+    drug = vapply(rows, drug_names, character(1)),
+    phenotype = field("phenotypeText"),
+    genotype = field("genotypeAnnotationText"),
+    evidence = field("evidenceLevel"),
+    stringsAsFactors = FALSE
+  )
+}
+
 # Pure parser: associated-disease rows -> data.frame(disease, disease_id, score).
 opentargets_parse_rows <- function(rows) {
   data.frame(
