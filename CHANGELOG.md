@@ -4,6 +4,9 @@ All notable changes to this project should be documented in this file.
 
 ## [Unreleased]
 
+- Added a **Phenotypes (HPO)** card: the Human Phenotype Ontology terms
+  associated with the gene, from the Monarch Initiative, each linked to its HPO
+  browser page. Readable by the assistant via `read_card`.
 - The assistant now connects on its own when a provider key is set in the
   environment: the matching provider starts selected, its default model is
   preselected, and the client is built on load, so the user can chat without

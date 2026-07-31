@@ -22,6 +22,7 @@
   gtex = "GTEx expression",
   string_ppi = "STRING",
   opentargets = "Open Targets",
+  phenotypes = "Phenotypes (HPO)",
   links = "External links"
 )
 
@@ -147,6 +148,10 @@ dashboard_page <- tagList(
     .card_when_shown("string_ppi", string_ppi_ui("string_ppi")),
     .card_when_shown("opentargets", opentargets_ui("opentargets"))
   ),
+  # Gene-level knowledge cards (phenotypes, drugs, pharmacogenomics, literature)
+  # are full width: their tables are wide (several columns each), so they read
+  # better across the whole column than squeezed into a half.
+  .card_when_shown("phenotypes", phenotypes_ui("phenotypes")),
   .card_when_shown("links", external_links_ui("links"))
 )
 

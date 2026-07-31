@@ -114,6 +114,11 @@
     description = "Disease associations for the gene (Open Targets)."
   ),
   list(
+    el = "tour_phenotypes",
+    title = "Phenotypes (HPO)",
+    description = "Human phenotypes associated with the gene (HPO via Monarch)."
+  ),
+  list(
     el = "tour_links",
     title = "External links",
     description = "Jump out to the source databases for the gene and variant."

@@ -141,3 +141,15 @@ src_clinvar_variation <- function(uid) {
     paste0("https://www.ncbi.nlm.nih.gov/clinvar/variation/", uid, "/")
   }
 }
+
+src_monarch_gene <- function(hgnc) {
+  if (is_blank(hgnc)) {
+    return(NULL)
+  }
+  id <- if (grepl("^HGNC:", hgnc, ignore.case = TRUE)) {
+    toupper(hgnc)
+  } else {
+    paste0("HGNC:", hgnc)
+  }
+  paste0("https://monarchinitiative.org/", id)
+}

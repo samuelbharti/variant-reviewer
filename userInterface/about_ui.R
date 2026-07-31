@@ -68,6 +68,11 @@
     "Gene-disease association evidence."
   ),
   list(
+    "Phenotypes (HPO)",
+    "Monarch Initiative",
+    "Human Phenotype Ontology terms associated with the gene."
+  ),
+  list(
     "External links",
     "derived",
     "Deep links to external resources for the gene and variant."

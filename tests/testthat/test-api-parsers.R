@@ -141,6 +141,22 @@ test_that("opentargets_parse_rows() builds a disease/score data.frame", {
   expect_equal(df$score, sort(df$score, decreasing = TRUE)) # API returns sorted
 })
 
+test_that("monarch_parse_items() builds an HPO id/phenotype data.frame", {
+  items <- read_fixture("monarch_phenotypes_tp53.json")$items
+  df <- monarch_parse_items(items)
+
+  expect_s3_class(df, "data.frame")
+  expect_named(df, c("hpo_id", "phenotype"))
+  expect_true(all(grepl("^HP:", df$hpo_id)))
+  expect_true(all(nzchar(df$phenotype)))
+})
+
+test_that("monarch_hgnc_id() normalizes to the HGNC CURIE", {
+  expect_equal(monarch_hgnc_id("11998"), "HGNC:11998")
+  expect_equal(monarch_hgnc_id("hgnc:11998"), "HGNC:11998")
+  expect_equal(monarch_hgnc_id(" HGNC:11998 "), "HGNC:11998")
+})
+
 test_that("clinvar_parse_record() extracts classification and conditions", {
   record <- read_fixture("clinvar_40389.json")
   res <- clinvar_parse_record(record, uid = "40389")
