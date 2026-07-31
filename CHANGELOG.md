@@ -4,6 +4,9 @@ All notable changes to this project should be documented in this file.
 
 ## [Unreleased]
 
+- Added a **Literature** card: recent publications for the gene from Europe PMC,
+  refined by the loaded variant's rsID when there is one, each title linked to
+  its Europe PMC article page. Readable by the assistant via `read_card`.
 - Added a **Pharmacogenomics** card: variant and genotype effects on drug
   response for the gene (Open Targets), with an evidence level and the full
   genotype note in an expandable row. When a variant is loaded, its matching

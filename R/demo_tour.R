@@ -135,6 +135,14 @@
     )
   ),
   list(
+    el = "tour_literature",
+    title = "Literature",
+    description = paste(
+      "Recent publications for the gene, refined by the variant when one is",
+      "loaded (Europe PMC)."
+    )
+  ),
+  list(
     el = "tour_links",
     title = "External links",
     description = "Jump out to the source databases for the gene and variant."

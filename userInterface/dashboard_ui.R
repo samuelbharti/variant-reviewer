@@ -25,6 +25,7 @@
   phenotypes = "Phenotypes (HPO)",
   drugs = "Known drugs",
   pharmacogenomics = "Pharmacogenomics",
+  literature = "Literature",
   links = "External links"
 )
 
@@ -159,6 +160,7 @@ dashboard_page <- tagList(
     "pharmacogenomics",
     pharmacogenomics_ui("pharmacogenomics")
   ),
+  .card_when_shown("literature", literature_ui("literature")),
   .card_when_shown("links", external_links_ui("links"))
 )
 

@@ -150,6 +150,16 @@ src_clinvar_variation <- function(uid) {
   }
 }
 
+src_europepmc_search <- function(query) {
+  if (is_blank(query)) {
+    return(NULL)
+  }
+  paste0(
+    "https://europepmc.org/search?query=",
+    utils::URLencode(query, reserved = TRUE)
+  )
+}
+
 src_monarch_gene <- function(hgnc) {
   if (is_blank(hgnc)) {
     return(NULL)

@@ -151,6 +151,7 @@ function(input, output, session) {
     resolved,
     variant_rsid
   )
+  literature_data <- literature_server("literature", resolved, variant_rsid)
   external_links_server("links", resolved)
   # Visualization cards. The ancestry card reuses the shared gnomAD result (no
   # extra fetch); the gene model reuses the VEP result for the variant position.
@@ -268,6 +269,12 @@ function(input, output, session) {
       get = pharmacogenomics_data
     ),
     list(
+      id = "literature",
+      label = "Europe PMC literature",
+      variant = FALSE,
+      get = literature_data
+    ),
+    list(
       id = "variant",
       label = "MyVariant annotation",
       variant = TRUE,
@@ -347,6 +354,7 @@ function(input, output, session) {
     phenotypes = "phenotypes",
     drugs = "drugs",
     pharmacogenomics = "pharmacogenomics",
+    literature = "literature",
     variant = "variant_summary",
     predictions = "predictions",
     protein = "protein_summary",

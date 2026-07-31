@@ -40,6 +40,10 @@ test_that("source URL builders return the expected links", {
     src_opentargets_drugs("ENSG00000157764"),
     "target/ENSG00000157764/known_drugs$"
   )
+  expect_match(
+    src_europepmc_search("\"BRAF\""),
+    "^https://europepmc.org/search\\?query=%22BRAF%22$"
+  )
 })
 
 test_that("source URL builders return NULL for blank identifiers", {

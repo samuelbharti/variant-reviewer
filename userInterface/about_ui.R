@@ -83,6 +83,11 @@
     "Variant and genotype effects on drug response, with evidence levels."
   ),
   list(
+    "Literature",
+    "Europe PMC",
+    "Recent publications for the gene, refined by the variant when loaded."
+  ),
+  list(
     "External links",
     "derived",
     "Deep links to external resources for the gene and variant."

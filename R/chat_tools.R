@@ -24,7 +24,8 @@ VR_CHAT_CARDS <- c(
   diseases = "Disease associations (Open Targets)",
   phenotypes = "Phenotypes (HPO / Monarch)",
   drugs = "Known drugs (Open Targets)",
-  pharmacogenomics = "Pharmacogenomics (Open Targets)"
+  pharmacogenomics = "Pharmacogenomics (Open Targets)",
+  literature = "Literature (Europe PMC)"
 )
 
 # Example prompts offered to the user (names are the short chip/card headings;
@@ -495,6 +496,39 @@ vr_chat_pharmacogenomics <- function(res) {
   )
 }
 
+vr_chat_literature <- function(res) {
+  g <- .vr_card_guard(res, "No literature yet (needs a gene).")
+  if (!is.null(g)) {
+    return(g)
+  }
+  df <- res$data
+  if (!is.data.frame(df) || nrow(df) == 0) {
+    return("No publications found.")
+  }
+  rows <- .vr_rows(df, 5, function(i) {
+    paste0(
+      df$title[i],
+      " (",
+      .vr_or(df$journal[i]),
+      " ",
+      .vr_or(df$year[i]),
+      ")"
+    )
+  })
+  extra <- if (!is_blank(res$count)) {
+    paste0(" (top ", nrow(df), " of ", format(res$count, big.mark = ","), ")")
+  } else {
+    ""
+  }
+  paste0(
+    "Recent literature",
+    extra,
+    ": ",
+    paste(rows, collapse = "; "),
+    "."
+  )
+}
+
 vr_chat_landscape <- function(res) {
   g <- .vr_card_guard(res, "No variant landscape yet (needs a gene).")
   if (!is.null(g)) {
@@ -591,6 +625,7 @@ vr_chat_card_text <- function(card, data) {
     phenotypes = vr_chat_phenotypes,
     drugs = vr_chat_drugs,
     pharmacogenomics = vr_chat_pharmacogenomics,
+    literature = vr_chat_literature,
     NULL
   )
   if (is.null(fn)) {

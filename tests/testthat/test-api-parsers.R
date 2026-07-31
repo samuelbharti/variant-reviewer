@@ -173,6 +173,26 @@ test_that("opentargets_parse_pgx() builds a variant/drug/effect data.frame", {
   expect_true(any(nzchar(df$phenotype)))
 })
 
+test_that("europepmc_parse_results() builds a citation data.frame", {
+  results <- read_fixture("europepmc_braf_v600e.json")$resultList$result
+  df <- europepmc_parse_results(results)
+
+  expect_named(
+    df,
+    c("title", "authors", "journal", "year", "id", "source", "doi", "cited_by")
+  )
+  expect_true(all(nzchar(df$title)))
+  expect_true(is.integer(df$cited_by))
+})
+
+test_that("europepmc_query() quotes the gene and ANDs a refinement", {
+  expect_equal(europepmc_query("BRAF"), "\"BRAF\"")
+  expect_equal(
+    europepmc_query("BRAF", "rs113488022"),
+    "\"BRAF\" AND \"rs113488022\""
+  )
+})
+
 test_that("monarch_parse_items() builds an HPO id/phenotype data.frame", {
   items <- read_fixture("monarch_phenotypes_tp53.json")$items
   df <- monarch_parse_items(items)
