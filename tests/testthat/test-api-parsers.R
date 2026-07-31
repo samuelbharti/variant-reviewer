@@ -17,6 +17,7 @@ test_that("mygene_parse_hit() normalizes a MyGene hit", {
   expect_equal(res$entrez, "7157")
   expect_equal(res$ensembl_gene, "ENSG00000141510")
   expect_equal(res$uniprot, "P04637")
+  expect_equal(res$hgnc, "11998")
   expect_match(res$summary, "tumor suppressor")
 })
 

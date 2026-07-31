@@ -27,7 +27,7 @@ mygene_query_term <- function(symbol) {
 
 # Returns:
 #   list(ok = TRUE, symbol, name, summary, entrez, ensembl_gene, uniprot,
-#        type_of_gene)
+#        hgnc, type_of_gene)
 #   list(ok = FALSE, error = "...")
 mygene_resolve <- function(symbol, species = "human") {
   cleaned <- mygene_clean_symbol(symbol)
@@ -42,7 +42,7 @@ mygene_resolve <- function(symbol, species = "human") {
       q = mygene_query_term(cleaned),
       species = species,
       size = 1,
-      fields = "name,symbol,entrezgene,ensembl.gene,uniprot,type_of_gene,summary"
+      fields = "name,symbol,entrezgene,ensembl.gene,uniprot,type_of_gene,summary,HGNC"
     ),
     source = "MyGene"
   )
@@ -71,6 +71,7 @@ mygene_parse_hit <- function(hit, fallback_symbol = NA_character_) {
     entrez = as.character(pluck_at(hit, "entrezgene", default = NA)),
     ensembl_gene = mygene_first(pluck_at(hit, "ensembl", "gene")),
     uniprot = mygene_first(pluck_at(hit, "uniprot", "Swiss-Prot")),
+    hgnc = as.character(pluck_at(hit, "HGNC", default = NA)),
     type_of_gene = pluck_at(hit, "type_of_gene", default = NA_character_)
   )
 }
