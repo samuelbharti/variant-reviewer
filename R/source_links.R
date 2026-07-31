@@ -73,6 +73,14 @@ src_opentargets_gene <- function(ensembl) {
   }
 }
 
+src_opentargets_drugs <- function(ensembl) {
+  if (is_blank(ensembl)) {
+    NULL
+  } else {
+    paste0("https://platform.opentargets.org/target/", ensembl, "/known_drugs")
+  }
+}
+
 src_gnomad_gene <- function(ensembl) {
   if (is_blank(ensembl)) {
     NULL

@@ -4,6 +4,10 @@ All notable changes to this project should be documented in this file.
 
 ## [Unreleased]
 
+- Added a **Known drugs** card: the drugs and clinical candidates that target
+  the gene (Open Targets), with each one's highest clinical stage and a lead
+  indication, linked to its Open Targets drug page. Readable by the assistant
+  via `read_card`.
 - Added a **Phenotypes (HPO)** card: the Human Phenotype Ontology terms
   associated with the gene, from the Monarch Initiative, each linked to its HPO
   browser page. Readable by the assistant via `read_card`.

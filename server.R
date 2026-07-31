@@ -145,6 +145,7 @@ function(input, output, session) {
   string_data <- string_ppi_server("string_ppi", resolved)
   opentargets_data <- opentargets_server("opentargets", resolved)
   phenotypes_data <- phenotypes_server("phenotypes", resolved)
+  drugs_data <- drugs_server("drugs", resolved)
   external_links_server("links", resolved)
   # Visualization cards. The ancestry card reuses the shared gnomAD result (no
   # extra fetch); the gene model reuses the VEP result for the variant position.
@@ -250,6 +251,12 @@ function(input, output, session) {
       get = phenotypes_data
     ),
     list(
+      id = "drugs",
+      label = "Open Targets drugs",
+      variant = FALSE,
+      get = drugs_data
+    ),
+    list(
       id = "variant",
       label = "MyVariant annotation",
       variant = TRUE,
@@ -327,6 +334,7 @@ function(input, output, session) {
     interactions = "string_ppi",
     diseases = "opentargets",
     phenotypes = "phenotypes",
+    drugs = "drugs",
     variant = "variant_summary",
     predictions = "predictions",
     protein = "protein_summary",

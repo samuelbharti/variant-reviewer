@@ -73,6 +73,11 @@
     "Human Phenotype Ontology terms associated with the gene."
   ),
   list(
+    "Known drugs",
+    "Open Targets",
+    "Drugs and clinical candidates targeting the gene, with clinical stage."
+  ),
+  list(
     "External links",
     "derived",
     "Deep links to external resources for the gene and variant."

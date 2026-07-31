@@ -23,6 +23,7 @@
   string_ppi = "STRING",
   opentargets = "Open Targets",
   phenotypes = "Phenotypes (HPO)",
+  drugs = "Known drugs",
   links = "External links"
 )
 
@@ -152,6 +153,7 @@ dashboard_page <- tagList(
   # are full width: their tables are wide (several columns each), so they read
   # better across the whole column than squeezed into a half.
   .card_when_shown("phenotypes", phenotypes_ui("phenotypes")),
+  .card_when_shown("drugs", drugs_ui("drugs")),
   .card_when_shown("links", external_links_ui("links"))
 )
 

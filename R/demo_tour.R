@@ -119,6 +119,14 @@
     description = "Human phenotypes associated with the gene (HPO via Monarch)."
   ),
   list(
+    el = "tour_drugs",
+    title = "Known drugs",
+    description = paste(
+      "Drugs and clinical candidates that target the gene, with their highest",
+      "clinical stage (Open Targets)."
+    )
+  ),
+  list(
     el = "tour_links",
     title = "External links",
     description = "Jump out to the source databases for the gene and variant."

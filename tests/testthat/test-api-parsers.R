@@ -141,6 +141,25 @@ test_that("opentargets_parse_rows() builds a disease/score data.frame", {
   expect_equal(df$score, sort(df$score, decreasing = TRUE)) # API returns sorted
 })
 
+test_that("opentargets_parse_drugs() builds a drug/phase/disease data.frame", {
+  rows <- read_fixture(
+    "opentargets_drugs_braf.json"
+  )$data$target$drugAndClinicalCandidates$rows
+  df <- opentargets_parse_drugs(rows)
+
+  expect_named(df, c("drug", "drug_id", "drug_type", "max_phase", "disease"))
+  expect_true(all(nzchar(df$drug)))
+  # Clinical stage is prettified from the API's SCREAMING_SNAKE form.
+  expect_true(any(grepl("^Phase ", df$max_phase)))
+  expect_false(any(grepl("_", df$max_phase))) # no PHASE_2 left
+})
+
+test_that("opentargets_pretty_phase() humanizes the stage enum", {
+  expect_equal(opentargets_pretty_phase("PHASE_2"), "Phase 2")
+  expect_equal(opentargets_pretty_phase("PRE_CLINICAL"), "Pre clinical")
+  expect_true(is.na(opentargets_pretty_phase("")))
+})
+
 test_that("monarch_parse_items() builds an HPO id/phenotype data.frame", {
   items <- read_fixture("monarch_phenotypes_tp53.json")$items
   df <- monarch_parse_items(items)

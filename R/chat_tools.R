@@ -22,7 +22,8 @@ VR_CHAT_CARDS <- c(
   expression = "Tissue expression (GTEx)",
   interactions = "Protein interactions (STRING)",
   diseases = "Disease associations (Open Targets)",
-  phenotypes = "Phenotypes (HPO / Monarch)"
+  phenotypes = "Phenotypes (HPO / Monarch)",
+  drugs = "Known drugs (Open Targets)"
 )
 
 # Example prompts offered to the user (names are the short chip/card headings;
@@ -429,6 +430,40 @@ vr_chat_phenotypes <- function(res) {
   )
 }
 
+vr_chat_drugs <- function(res) {
+  g <- .vr_card_guard(res, "No known drugs yet (needs a gene).")
+  if (!is.null(g)) {
+    return(g)
+  }
+  df <- res$data
+  if (!is.data.frame(df) || nrow(df) == 0) {
+    return("No known drugs or clinical candidates.")
+  }
+  rows <- .vr_rows(df, 10, function(i) {
+    paste0(
+      df$drug[i],
+      " (",
+      .vr_or(df$drug_type[i]),
+      ", ",
+      .vr_or(df$max_phase[i]),
+      if (!is_blank(df$disease[i])) paste0("; ", df$disease[i]) else "",
+      ")"
+    )
+  })
+  extra <- if (!is_blank(res$count)) {
+    paste0(" (top ", nrow(df), " of ", res$count, ")")
+  } else {
+    ""
+  }
+  paste0(
+    "Known drugs and clinical candidates",
+    extra,
+    ": ",
+    paste(rows, collapse = "; "),
+    "."
+  )
+}
+
 vr_chat_landscape <- function(res) {
   g <- .vr_card_guard(res, "No variant landscape yet (needs a gene).")
   if (!is.null(g)) {
@@ -523,6 +558,7 @@ vr_chat_card_text <- function(card, data) {
     interactions = vr_chat_interactions,
     diseases = vr_chat_diseases,
     phenotypes = vr_chat_phenotypes,
+    drugs = vr_chat_drugs,
     NULL
   )
   if (is.null(fn)) {
