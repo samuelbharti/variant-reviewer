@@ -1,7 +1,7 @@
 cff-version: 1.1.0
 message: "If you use this software, please cite it as below."
 title: "Variant Reviewer"
-version: "2.2.0" # keep in sync with app_version() in R/utils.R
+version: "2.3.0" # keep in sync with app_version() in R/utils.R
 # doi: set this once a Zenodo release exists (e.g. 10.5281/zenodo.xxxxx)
 repository-code: "https://github.com/samuelbharti/variant-reviewer"
 authors:
