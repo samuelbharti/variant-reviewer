@@ -2,12 +2,14 @@
 
 ```txt
 .
+├── app.R
+├── app_ui.R
+├── app_server.R
 ├── global.R
-├── ui.R
-├── server.R
 ├── R/
 ├── modules/
 ├── userInterface/
+├── tests/
 ├── data/
 ├── dev/
 ├── docs/
@@ -16,8 +18,8 @@
 
 ## Notes
 
-- This app uses Shiny's multi-file format: `shiny::runApp()` loads `global.R`,
-  then `ui.R` (defines the UI) and `server.R` (defines the server function).
+- `app.R` is the entry point. It sources `global.R`, then loads the UI from
+  `app_ui.R` and the server function from `app_server.R`.
 - `global.R` loads dependencies and sources components.
-- `R/load_components.R` automatically sources modules and page UI files.
-- `www/` stores static assets such as CSS, JavaScript, and images.
+- `R/load_components.R` sources modules and page UI files automatically.
+- `www/` stores static assets, such as CSS, JavaScript, and images.
