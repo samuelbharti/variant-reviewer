@@ -14,7 +14,12 @@ function(input, output, session) {
   #
   # annotation_retry: the Variant card has no fetch of its own (it just
   # renders variant_annotation directly), so its refresh button bumps this to
-  # retry the fetch below. See vr_retry_counter() in R/source_links.R.
+  # retry the fetch below. See vr_retry_counter() in R/source_links.R. The
+  # protein/domains/structure/landscape cards also read variant_annotation
+  # (for the residue position), so a retry here recomputes those too --
+  # harmless (a card whose own fetch already succeeded just re-reads its own
+  # cached result) and usually exactly what you want, since a failed
+  # MyVariant fetch would have been the reason they were empty too.
   annotation_retry <- vr_retry_counter()
   annotation_raw <- reactive({
     annotation_retry$dep()
@@ -69,7 +74,11 @@ function(input, output, session) {
   #
   # resolved_retry: the Gene card has no fetch of its own (it just renders
   # resolved directly), so its refresh button bumps this to retry the fetch
-  # below. See vr_retry_counter() in R/source_links.R.
+  # below. See vr_retry_counter() in R/source_links.R. Every gene-scoped card
+  # reads resolved(), so a retry here recomputes those too -- harmless (a
+  # card whose own fetch already succeeded just re-reads its own cached
+  # result) and usually exactly what you want, since a failed MyGene lookup
+  # would have been the reason they were empty too.
   resolved_retry <- vr_retry_counter()
   resolved <- reactive({
     resolved_retry$dep()
@@ -385,16 +394,21 @@ function(input, output, session) {
     genemodel = "genemodel"
   )
 
+  # Whether `src` is currently fetched: its card is on screen and the query
+  # can actually answer it (variant-level sources need a variant). A plain
+  # function rather than a reactive, so each caller below chooses whether
+  # reading it should count as a dependency (the search-driven walk) or not
+  # (the per-source retry mirror, via isolate() -- see its comment).
+  applies <- function(src) {
+    query <- search_effective()
+    shown <- input$visible_cards %||% names(.dashboard_cards)
+    has_variant <- !is.null(query) && !is_blank(query$variant)
+    (!src$variant || has_variant) && source_card[[src$id]] %in% shown
+  }
+
   observe(
     {
       query <- search_effective()
-      shown <- input$visible_cards %||% names(.dashboard_cards)
-      # A source is fetched when its card is on screen and the query can
-      # actually answer it (variant-level sources need a variant).
-      applies <- function(src) {
-        has_variant <- !is.null(query) && !is_blank(query$variant)
-        (!src$variant || has_variant) && source_card[[src$id]] %in% shown
-      }
       total <- length(Filter(applies, sources))
 
       bar <- NULL
@@ -417,9 +431,14 @@ function(input, output, session) {
             detail = src$label
           )
         }
-        # Forcing the reactive here is what triggers the fetch; the card outputs
-        # then render from the cached value.
-        dash[[src$id]] <- src$get()
+        # Forcing the reactive here is what triggers the fetch; the card
+        # outputs then render from the cached value. isolate()d so this
+        # observer's only real dependencies stay search_effective() and
+        # input$visible_cards: a single card's retry button must not restart
+        # this whole ordered walk (and its progress popup) for every source --
+        # see the per-source mirror below, which is what keeps `dash` in sync
+        # for a retry instead.
+        dash[[src$id]] <- isolate(src$get())
         done <- done + 1L
       }
 
@@ -433,6 +452,26 @@ function(input, output, session) {
     },
     priority = 100
   )
+
+  # Re-mirror one source into `dash` when its own reactive changes for a
+  # reason other than the walk above -- in practice, a card's own retry
+  # button. Each observer depends on nothing but that one source's reactive,
+  # so a retry updates only that source's dash entry, without re-running the
+  # ordered walk/progress popup for every card (default priority: it runs
+  # after the walk above during an actual new search, by which point the
+  # value is already computed, so this just re-reads the cached result rather
+  # than racing it for who "pays" for the fetch).
+  for (.src in sources) {
+    local({
+      src <- .src
+      observe({
+        value <- src$get()
+        if (isolate(applies(src))) {
+          dash[[src$id]] <- value
+        }
+      })
+    })
+  }
 
   # The assistant's only way to change the dashboard: type a gene/variant into
   # the search box and click Review. It hands the request to the search module,
