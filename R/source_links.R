@@ -73,6 +73,26 @@ src_opentargets_gene <- function(ensembl) {
   }
 }
 
+src_opentargets_drugs <- function(ensembl) {
+  if (is_blank(ensembl)) {
+    NULL
+  } else {
+    paste0("https://platform.opentargets.org/target/", ensembl, "/known_drugs")
+  }
+}
+
+src_opentargets_pgx <- function(ensembl) {
+  if (is_blank(ensembl)) {
+    NULL
+  } else {
+    paste0(
+      "https://platform.opentargets.org/target/",
+      ensembl,
+      "/pharmacogenomics"
+    )
+  }
+}
+
 src_gnomad_gene <- function(ensembl) {
   if (is_blank(ensembl)) {
     NULL
@@ -140,4 +160,21 @@ src_clinvar_variation <- function(uid) {
   } else {
     paste0("https://www.ncbi.nlm.nih.gov/clinvar/variation/", uid, "/")
   }
+}
+
+src_europepmc_search <- function(query) {
+  if (is_blank(query)) {
+    return(NULL)
+  }
+  paste0(
+    "https://europepmc.org/search?query=",
+    utils::URLencode(query, reserved = TRUE)
+  )
+}
+
+src_monarch_gene <- function(hgnc) {
+  if (is_blank(hgnc)) {
+    return(NULL)
+  }
+  paste0("https://monarchinitiative.org/", monarch_hgnc_id(hgnc))
 }

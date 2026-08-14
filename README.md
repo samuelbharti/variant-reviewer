@@ -26,6 +26,10 @@ The app is a thin, reactive front end over several public bioinformatics APIs:
 | Tissue expression       | GTEx                              |
 | Protein interactions    | STRING                            |
 | Disease associations    | Open Targets                      |
+| Phenotypes (HPO)        | Monarch Initiative                |
+| Known drugs             | Open Targets                      |
+| Pharmacogenomics        | Open Targets                      |
+| Literature              | Europe PMC                        |
 | External resource links | derived                           |
 | AI assistant (chat)     | BYOK: Gemini / OpenAI / Anthropic |
 

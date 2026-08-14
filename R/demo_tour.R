@@ -114,6 +114,35 @@
     description = "Disease associations for the gene (Open Targets)."
   ),
   list(
+    el = "tour_phenotypes",
+    title = "Phenotypes (HPO)",
+    description = "Human phenotypes associated with the gene (HPO via Monarch)."
+  ),
+  list(
+    el = "tour_drugs",
+    title = "Known drugs",
+    description = paste(
+      "Drugs and clinical candidates that target the gene, with their highest",
+      "clinical stage (Open Targets)."
+    )
+  ),
+  list(
+    el = "tour_pharmacogenomics",
+    title = "Pharmacogenomics",
+    description = paste(
+      "Variant and genotype effects on drug response, with an evidence level",
+      "(Open Targets)."
+    )
+  ),
+  list(
+    el = "tour_literature",
+    title = "Literature",
+    description = paste(
+      "Recent publications for the gene, refined by the variant when one is",
+      "loaded (Europe PMC)."
+    )
+  ),
+  list(
     el = "tour_links",
     title = "External links",
     description = "Jump out to the source databases for the gene and variant."

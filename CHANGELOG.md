@@ -4,6 +4,21 @@ All notable changes to this project should be documented in this file.
 
 ## [Unreleased]
 
+- Added a **Literature** card: recent publications for the gene from Europe PMC,
+  refined by the loaded variant's rsID when there is one, each title linked to
+  its Europe PMC article page. Readable by the assistant via `read_card`.
+- Added a **Pharmacogenomics** card: variant and genotype effects on drug
+  response for the gene (Open Targets), with an evidence level and the full
+  genotype note in an expandable row. When a variant is loaded, its matching
+  annotations are sorted to the top and called out. Readable by the assistant
+  via `read_card`.
+- Added a **Known drugs** card: the drugs and clinical candidates that target
+  the gene (Open Targets), with each one's highest clinical stage and a lead
+  indication, linked to its Open Targets drug page. Readable by the assistant
+  via `read_card`.
+- Added a **Phenotypes (HPO)** card: the Human Phenotype Ontology terms
+  associated with the gene, from the Monarch Initiative, each linked to its HPO
+  browser page. Readable by the assistant via `read_card`.
 - The assistant now connects on its own when a provider key is set in the
   environment: the matching provider starts selected, its default model is
   preselected, and the client is built on load, so the user can chat without
