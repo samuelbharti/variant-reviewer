@@ -22,8 +22,11 @@ gene_model_ui <- function(id) {
 gene_model_server <- function(id, resolved, gnomad_data) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    retry <- vr_retry_counter()
+    vr_card_refresh_observer(input, retry$bump)
 
     model <- reactive({
+      retry$dep()
       res <- resolved()
       if (is.null(res) || !isTRUE(res$ok) || is_blank(res$ensembl_gene)) {
         return(NULL)

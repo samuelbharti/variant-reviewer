@@ -17,8 +17,11 @@ opentargets_ui <- function(id) {
 opentargets_server <- function(id, resolved) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    retry <- vr_retry_counter()
+    vr_card_refresh_observer(input, retry$bump)
 
     diseases <- reactive({
+      retry$dep()
       res <- resolved()
       if (is.null(res) || !isTRUE(res$ok)) {
         return(NULL)

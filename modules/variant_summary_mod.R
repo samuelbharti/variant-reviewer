@@ -15,8 +15,13 @@ variant_summary_ui <- function(id) {
 
 # annotation: reactive() returning the myvariant_annotate() result, or NULL when
 # no variant was supplied.
-variant_summary_server <- function(id, annotation) {
+# retry_annotation: the shared `annotation_raw` reactive's retry-bump function
+# (see app_server.R). This card has no fetch of its own -- it just renders
+# `annotation` directly -- so its refresh button has to retry that instead.
+variant_summary_server <- function(id, annotation, retry_annotation) {
   moduleServer(id, function(input, output, session) {
+    vr_card_refresh_observer(input, retry_annotation)
+
     output$source <- renderUI({
       res <- annotation()
       req(!is.null(res), isTRUE(res$ok))

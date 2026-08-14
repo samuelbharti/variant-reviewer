@@ -41,6 +41,10 @@ test_that("source URL builders return the expected links", {
     "target/ENSG00000157764/known_drugs$"
   )
   expect_match(
+    src_opentargets_pgx("ENSG00000157764"),
+    "target/ENSG00000157764/pharmacogenomics$"
+  )
+  expect_match(
     src_europepmc_search("\"BRAF\""),
     "^https://europepmc.org/search\\?query=%22BRAF%22$"
   )
@@ -58,4 +62,49 @@ test_that("vr_source_link renders an anchor, or NULL without an href", {
   html <- as.character(vr_source_link("https://example.org", "Source"))
   expect_match(html, "href=\"https://example.org\"")
   expect_match(html, "Source")
+})
+
+test_that("vr_card_header includes a refresh button at ns('refresh')", {
+  ns <- NS("mycard")
+  html <- as.character(vr_card_header("My card", ns))
+  expect_match(html, 'id="mycard-refresh"')
+})
+
+test_that("vr_retry_counter's dep/bump wire a reactive to re-run on demand", {
+  shiny::testServer(
+    function(id) {
+      moduleServer(id, function(input, output, session) {
+        retry <- vr_retry_counter()
+        n_runs <- 0L
+        data <- reactive({
+          retry$dep()
+          n_runs <<- n_runs + 1L
+          n_runs
+        })
+        list(data = data, bump = retry$bump)
+      })
+    },
+    {
+      expect_equal(session$returned$data(), 1L)
+      expect_equal(session$returned$data(), 1L) # cached: no re-run yet
+      session$returned$bump()
+      session$flushReact()
+      expect_equal(session$returned$data(), 2L)
+    }
+  )
+})
+
+test_that("vr_card_refresh_observer's bump fires on the header's refresh click", {
+  bumped <- 0L
+  testServer(
+    function(id) {
+      moduleServer(id, function(input, output, session) {
+        vr_card_refresh_observer(input, function() bumped <<- bumped + 1L)
+      })
+    },
+    {
+      session$setInputs(refresh = 1)
+      expect_equal(bumped, 1L)
+    }
+  )
 })

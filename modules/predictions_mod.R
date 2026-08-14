@@ -17,7 +17,11 @@ predictions_ui <- function(id) {
 # search: reactive() -> list(gene, variant) (uses the variant string).
 predictions_server <- function(id, search) {
   moduleServer(id, function(input, output, session) {
+    retry <- vr_retry_counter()
+    vr_card_refresh_observer(input, retry$bump)
+
     predictions <- reactive({
+      retry$dep()
       query <- search()
       if (is.null(query) || is_blank(query$variant)) {
         return(NULL)

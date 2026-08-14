@@ -16,7 +16,11 @@ gene_constraint_ui <- function(id) {
 # resolved: reactive() -> mygene_resolve() result (uses the gene symbol).
 gene_constraint_server <- function(id, resolved) {
   moduleServer(id, function(input, output, session) {
+    retry <- vr_retry_counter()
+    vr_card_refresh_observer(input, retry$bump)
+
     constraint <- reactive({
+      retry$dep()
       res <- resolved()
       if (is.null(res) || !isTRUE(res$ok)) {
         return(NULL)

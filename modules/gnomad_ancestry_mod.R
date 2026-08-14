@@ -16,9 +16,13 @@ gnomad_ancestry_ui <- function(id) {
 }
 
 # gnomad_data: reactive() -> gnomad_frequency() result (carries $populations).
-gnomad_ancestry_server <- function(id, gnomad_data) {
+# retry_gnomad: the gnomAD card's own retry-bump function (see gnomad_server()
+# in gnomad_mod.R). This card has no fetch of its own -- it renders the same
+# result the gnomAD card fetched -- so its refresh button has to retry that.
+gnomad_ancestry_server <- function(id, gnomad_data, retry_gnomad) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    vr_card_refresh_observer(input, retry_gnomad)
 
     output$source <- renderUI({
       res <- gnomad_data()

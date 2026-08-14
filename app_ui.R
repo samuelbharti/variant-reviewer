@@ -6,7 +6,18 @@ page_navbar(
   title = "Variant Reviewer",
   # Apply branding from _brand.yml (colors, fonts). brand = TRUE requires the
   # file to exist; switch to bslib::bs_theme() to make it optional.
-  theme = bslib::bs_theme(brand = TRUE),
+  #
+  # bslib defaults card-bg to the page's own body-bg, so with the brand's
+  # "paper" background a card is the exact same color as the page behind it.
+  # Lifting cards to white gives them a visible edge against the page; the
+  # card-header wash in app.css (a light tint of the brand primary) still
+  # separates header from body on top of that.
+  theme = bslib::bs_theme(brand = TRUE) |>
+    bslib::bs_add_variables("card-bg" = "#ffffff"),
+  # Charcoal navbar (see _brand.yml's `charcoal`) so it reads as a distinct
+  # band above the page rather than blending into the "paper" background;
+  # theme = "dark" switches the nav text/icons to light for contrast on it.
+  navbar_options = bslib::navbar_options(bg = "#2c2a25", theme = "dark"),
   fillable = FALSE,
   header = tags$head(
     tags$link(rel = "stylesheet", type = "text/css", href = "css/app.css"),
@@ -44,13 +55,18 @@ page_navbar(
   ),
   # Right-aligned demo button: loads a worked example into the dashboard and
   # explains how to use the app and the assistant (wired in server.R).
+  #
+  # btn-outline-light, not -primary: the navbar is dark now, and an
+  # outline-primary button's green border/text has too little contrast against
+  # charcoal at rest (it only stood out on hover, when the fill kicks in).
+  # outline-light matches the rest of the nav's light-on-dark text.
   nav_spacer(),
   nav_item(
     actionButton(
       "demo",
       "Demo",
       icon = icon("wand-magic-sparkles"),
-      class = "btn-sm btn-outline-primary"
+      class = "btn-sm btn-outline-light"
     )
   ),
   footer = tags$footer(

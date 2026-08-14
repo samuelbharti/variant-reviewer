@@ -45,10 +45,13 @@ variant_landscape_ui <- function(id) {
 variant_landscape_server <- function(id, resolved, search, annotation) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    retry <- vr_retry_counter()
+    vr_card_refresh_observer(input, retry$bump)
 
     # Aggregate ClinVar variants to one row per residue (count + dominant
     # significance), and assemble the domain track and queried-residue marker.
     landscape <- reactive({
+      retry$dep()
       res <- resolved()
       if (is.null(res) || !isTRUE(res$ok) || is_blank(res$symbol)) {
         return(NULL)

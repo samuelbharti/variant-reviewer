@@ -19,8 +19,11 @@ protein_domains_ui <- function(id) {
 protein_domains_server <- function(id, resolved, search, annotation) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    retry <- vr_retry_counter()
+    vr_card_refresh_observer(input, retry$bump)
 
     features <- reactive({
+      retry$dep()
       res <- resolved()
       if (is.null(res) || !isTRUE(res$ok)) {
         return(NULL)
