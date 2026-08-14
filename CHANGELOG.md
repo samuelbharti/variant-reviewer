@@ -4,6 +4,13 @@ All notable changes to this project should be documented in this file.
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-08-14
+
+- Added Posit Connect Cloud deployment support: an `app.R` entry point, a
+  committed `manifest.json`, and an `.rscignore` that keeps `.Renviron` out of
+  the bundle.
+- The Demo now preloads its example (BRAF V600E) from a recorded cache, so it
+  loads from memory instead of waiting on the live APIs.
 - Added a **Literature** card: recent publications for the gene from Europe PMC,
   refined by the loaded variant's rsID when there is one, each title linked to
   its Europe PMC article page. Readable by the assistant via `read_card`.

@@ -1,7 +1,7 @@
 # Protein "lollipop" card. Places every ClinVar variant for the gene at its
 # protein residue (coloured by clinical significance, height = number of
 # variants there), over a track of the protein's domains, with the queried
-# variant marked — so you can see at a glance whether it sits in a mutational
+# variant marked, so you can see at a glance whether it sits in a mutational
 # hotspot or a functional domain.
 
 # Coarse-significance colours and their severity order (most severe first, used
@@ -16,7 +16,7 @@
 .vl_severity <- stats::setNames(seq_along(.vl_palette), names(.vl_palette))
 
 # UniProt feature types drawn as spans in the domain track (point sites are
-# excluded — they add nothing to a whole-protein overview).
+# excluded, since they add nothing to a whole-protein overview).
 .vl_domain_types <- c(
   "DOMAIN",
   "REGION",

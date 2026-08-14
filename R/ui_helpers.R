@@ -5,7 +5,7 @@
 `%||%` <- function(x, y) if (is.null(x)) y else x # nolint: object_name_linter.
 
 # App palette (organic, mirrors the color palette in _brand.yml). Used where a
-# color must be set in R — e.g. ggplot geoms — rather than via the CSS theme.
+# color must be set in R (e.g. ggplot geoms) rather than via the CSS theme.
 vr_colors <- list(
   primary = "#4c7a5b", # sage/forest green
   accent = "#c07a52", # warm clay

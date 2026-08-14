@@ -4,7 +4,7 @@ Please cite this repository when using it in publications or derivative projects
 
 Recommended citation (APA):
 
-Bharti, S. (2026). *Variant Reviewer* (version 2.2.0) [Software]. GitHub. <https://github.com/samuelbharti/variant-reviewer>
+Bharti, S. (2026). *Variant Reviewer* (version 2.3.0) [Software]. GitHub. <https://github.com/samuelbharti/variant-reviewer>
 
 BibTeX:
 
@@ -12,7 +12,7 @@ BibTeX:
 @software{variant_reviewer_2026,
   author = {Bharti, Samuel},
   title = {Variant Reviewer},
-  version = {2.2.0},
+  version = {2.3.0},
   url = {https://github.com/samuelbharti/variant-reviewer}
 }
 ```
