@@ -14,8 +14,13 @@ gene_summary_ui <- function(id) {
 
 # resolved: reactive() returning the mygene_resolve() result (or NULL before a
 # search has run).
-gene_summary_server <- function(id, resolved) {
+# retry_resolved: the shared `resolved` reactive's retry-bump function (see
+# app_server.R). This card has no fetch of its own -- it just renders
+# `resolved` directly -- so its refresh button has to retry that instead.
+gene_summary_server <- function(id, resolved, retry_resolved) {
   moduleServer(id, function(input, output, session) {
+    vr_card_refresh_observer(input, retry_resolved)
+
     output$source <- renderUI({
       res <- resolved()
       req(!is.null(res), isTRUE(res$ok))

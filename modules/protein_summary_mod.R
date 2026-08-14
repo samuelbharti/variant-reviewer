@@ -19,7 +19,11 @@ protein_summary_ui <- function(id) {
 #             protein position for rsID/HGVS inputs via its hgvsp).
 protein_summary_server <- function(id, resolved, search, annotation) {
   moduleServer(id, function(input, output, session) {
+    retry <- vr_retry_counter()
+    vr_card_refresh_observer(input, retry$bump)
+
     protein <- reactive({
+      retry$dep()
       res <- resolved()
       query <- search()
       if (

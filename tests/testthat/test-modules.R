@@ -93,8 +93,20 @@ test_that("gene_search_server returns NULL variant when omitted", {
 
 test_that("gene_summary_server renders an error state without crashing", {
   resolved <- reactive(list(ok = FALSE, error = "No gene found."))
-  testServer(gene_summary_server, args = list(resolved = resolved), {
-    # renderUI evaluates lazily; force it and confirm it builds HTML.
-    expect_no_error(output$content)
-  })
+  retried <- 0L
+  testServer(
+    gene_summary_server,
+    args = list(resolved = resolved, retry_resolved = function() {
+      retried <<- retried + 1L
+    }),
+    {
+      # renderUI evaluates lazily; force it and confirm it builds HTML.
+      expect_no_error(output$content)
+
+      # The header's refresh button (see vr_card_header()) bumps the retry
+      # function this card was given, since it has no fetch of its own.
+      session$setInputs(refresh = 1)
+      expect_equal(retried, 1L)
+    }
+  )
 })

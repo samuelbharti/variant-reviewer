@@ -156,3 +156,17 @@
   border-bottom-color: #dbe4d9;
   border-bottom-color: color-mix(in srgb, var(--bs-primary) 22%, var(--bs-border-color));
 }
+
+/* Card-header refresh icon (see vr_card_header() in R/source_links.R): muted
+   at rest so it doesn't compete with the bold title next to it, primary-
+   colored on hover/focus so it still reads as clickable. */
+.vr-card-refresh {
+  color: var(--bs-secondary-color);
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.vr-card-refresh:hover,
+.vr-card-refresh:focus-visible {
+  color: var(--bs-primary);
+}

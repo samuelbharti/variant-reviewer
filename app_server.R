@@ -11,7 +11,13 @@ function(input, output, session) {
   # Raw MyVariant annotation for the entered variant. Shared so the fetch runs
   # once; the card-facing variant_annotation below gates it on the gene and
   # variant being consistent.
+  #
+  # annotation_retry: the Variant card has no fetch of its own (it just
+  # renders variant_annotation directly), so its refresh button bumps this to
+  # retry the fetch below. See vr_retry_counter() in R/source_links.R.
+  annotation_retry <- vr_retry_counter()
   annotation_raw <- reactive({
+    annotation_retry$dep()
     query <- search()
     if (is.null(query) || is_blank(query$variant)) {
       return(NULL)
@@ -60,7 +66,13 @@ function(input, output, session) {
   })
 
   # Gene identifiers for the effective gene (typed, or the variant's own gene).
+  #
+  # resolved_retry: the Gene card has no fetch of its own (it just renders
+  # resolved directly), so its refresh button bumps this to retry the fetch
+  # below. See vr_retry_counter() in R/source_links.R.
+  resolved_retry <- vr_retry_counter()
   resolved <- reactive({
+    resolved_retry$dep()
     ctx <- ok_context()
     if (is.null(ctx) || is_blank(ctx$effective_gene)) {
       return(NULL)
@@ -116,8 +128,12 @@ function(input, output, session) {
   # Each result module returns its data reactive so the assistant can read what
   # each card shows (gene_summary/variant_summary just render the shared
   # resolved/annotation reactives, so those are reused directly).
-  gene_summary_server("gene_summary", resolved)
-  variant_summary_server("variant_summary", variant_annotation)
+  gene_summary_server("gene_summary", resolved, resolved_retry$bump)
+  variant_summary_server(
+    "variant_summary",
+    variant_annotation,
+    annotation_retry$bump
+  )
   predictions_data <- predictions_server("predictions", search_effective)
   protein_data <- protein_summary_server(
     "protein_summary",
@@ -138,7 +154,11 @@ function(input, output, session) {
     variant_annotation
   )
   clinvar_data <- clinvar_server("clinvar", variant_rsid)
-  gnomad_data <- gnomad_server("gnomad", variant_rsid)
+  # gnomad_server() also returns its retry-bump function, so the ancestry card
+  # below -- which renders this same result rather than fetching its own --
+  # can wire its own refresh button to retry it too.
+  gnomad_result <- gnomad_server("gnomad", variant_rsid)
+  gnomad_data <- gnomad_result$data
   constraint_data <- gene_constraint_server("constraint", resolved)
   ensembl_data <- ensembl_server("ensembl", variant_rsid)
   gtex_data <- gtex_expression_server("gtex", resolved)
@@ -163,7 +183,7 @@ function(input, output, session) {
   )
   conservation_data <- conservation_server("conservation", variant_rsid)
   genemodel_data <- gene_model_server("genemodel", resolved, gnomad_data)
-  gnomad_ancestry_server("gnomad_ancestry", gnomad_data)
+  gnomad_ancestry_server("gnomad_ancestry", gnomad_data, gnomad_result$retry)
 
   # --- AI assistant ---------------------------------------------------------
   # Mirror each card's current data into a plain (non-reactive) store so the

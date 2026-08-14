@@ -17,8 +17,11 @@ string_ppi_ui <- function(id) {
 string_ppi_server <- function(id, resolved) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    retry <- vr_retry_counter()
+    vr_card_refresh_observer(input, retry$bump)
 
     partners <- reactive({
+      retry$dep()
       res <- resolved()
       if (is.null(res) || !isTRUE(res$ok)) {
         return(NULL)

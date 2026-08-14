@@ -14,9 +14,18 @@ gnomad_ui <- function(id) {
 }
 
 # rsid: reactive() -> dbSNP rsID string (or NULL when none is available).
+#
+# Returns list(data, retry): `data` is the frequency reactive, exactly as
+# before; `retry` is this card's retry-bump function, exposed so the gnomAD
+# ancestry card -- which renders this same fetch rather than making its own --
+# can also retry it from its own header button (see gnomad_ancestry_server()).
 gnomad_server <- function(id, rsid) {
   moduleServer(id, function(input, output, session) {
+    retry <- vr_retry_counter()
+    vr_card_refresh_observer(input, retry$bump)
+
     frequency <- reactive({
+      retry$dep()
       id_value <- rsid()
       if (is_blank(id_value)) {
         return(NULL)
@@ -61,8 +70,9 @@ gnomad_server <- function(id, rsid) {
       )
     })
 
-    # Returned so the parent can surface this card's data to the assistant.
-    frequency
+    # data: so the parent can surface this card's data to the assistant, same
+    # as every other module. retry: see the function comment above.
+    list(data = frequency, retry = retry$bump)
   })
 }
 

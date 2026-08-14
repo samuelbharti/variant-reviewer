@@ -16,7 +16,11 @@ clinvar_ui <- function(id) {
 # rsid: reactive() -> dbSNP rsID string (or NULL when none is available).
 clinvar_server <- function(id, rsid) {
   moduleServer(id, function(input, output, session) {
+    retry <- vr_retry_counter()
+    vr_card_refresh_observer(input, retry$bump)
+
     classification <- reactive({
+      retry$dep()
       id_value <- rsid()
       if (is_blank(id_value)) {
         return(NULL)

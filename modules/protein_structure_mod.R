@@ -35,10 +35,13 @@ protein_structure_ui <- function(id) {
 protein_structure_server <- function(id, resolved, search, annotation) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    retry <- vr_retry_counter()
+    vr_card_refresh_observer(input, retry$bump)
 
     # Lightweight metadata only (model URL + residue) -- no coordinate download,
     # so this is safe to read from the assistant snapshot on every search.
     meta <- reactive({
+      retry$dep()
       res <- resolved()
       if (is.null(res) || !isTRUE(res$ok)) {
         return(NULL)

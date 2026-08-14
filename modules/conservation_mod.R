@@ -18,8 +18,11 @@ conservation_ui <- function(id) {
 conservation_server <- function(id, rsid) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+    retry <- vr_retry_counter()
+    vr_card_refresh_observer(input, retry$bump)
 
     conservation <- reactive({
+      retry$dep()
       id_value <- rsid()
       if (is_blank(id_value)) {
         return(NULL)
