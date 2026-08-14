@@ -1,6 +1,6 @@
 # Known-drugs card. Lists the drugs and clinical candidates that target the
-# gene's protein (Open Targets), with their highest clinical stage and a lead
-# indication, as a reactable.
+# gene's protein (Open Targets), with their highest clinical stage and the
+# indication(s) they have been tried against, as a reactable.
 
 drugs_ui <- function(id) {
   ns <- NS(id)
@@ -68,7 +68,7 @@ drugs_server <- function(id, resolved) {
           ),
           drug_type = reactable::colDef(name = "Type", maxWidth = 130),
           max_phase = reactable::colDef(name = "Max phase", maxWidth = 110),
-          disease = reactable::colDef(name = "Lead indication", minWidth = 160)
+          disease = reactable::colDef(name = "Indication(s)", minWidth = 160)
         )
       )
     })

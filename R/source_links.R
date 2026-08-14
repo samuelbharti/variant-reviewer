@@ -81,6 +81,18 @@ src_opentargets_drugs <- function(ensembl) {
   }
 }
 
+src_opentargets_pgx <- function(ensembl) {
+  if (is_blank(ensembl)) {
+    NULL
+  } else {
+    paste0(
+      "https://platform.opentargets.org/target/",
+      ensembl,
+      "/pharmacogenomics"
+    )
+  }
+}
+
 src_gnomad_gene <- function(ensembl) {
   if (is_blank(ensembl)) {
     NULL
@@ -164,10 +176,5 @@ src_monarch_gene <- function(hgnc) {
   if (is_blank(hgnc)) {
     return(NULL)
   }
-  id <- if (grepl("^HGNC:", hgnc, ignore.case = TRUE)) {
-    toupper(hgnc)
-  } else {
-    paste0("HGNC:", hgnc)
-  }
-  paste0("https://monarchinitiative.org/", id)
+  paste0("https://monarchinitiative.org/", monarch_hgnc_id(hgnc))
 }

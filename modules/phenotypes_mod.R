@@ -1,6 +1,7 @@
 # HPO phenotype card. Lists the human phenotypes associated with the gene
 # (Monarch Initiative, aggregating HPO annotations) as a reactable, each term
-# linked to its HPO browser page.
+# linked to its Monarch page (hpo.jax.org's own term-browser URL no longer
+# resolves; Monarch mirrors the same HPO term pages under its CURIE scheme).
 
 phenotypes_ui <- function(id) {
   ns <- NS(id)
@@ -55,11 +56,11 @@ phenotypes_server <- function(id, resolved) {
             name = "HPO term",
             maxWidth = 140,
             html = TRUE,
-            # Link each term to its HPO browser page.
+            # Link each term to its Monarch page.
             cell = function(value) {
               sprintf(
                 paste0(
-                  '<a href="https://hpo.jax.org/browse/term/%s"',
+                  '<a href="https://monarchinitiative.org/%s"',
                   ' target="_blank" rel="noopener noreferrer">%s</a>'
                 ),
                 value,

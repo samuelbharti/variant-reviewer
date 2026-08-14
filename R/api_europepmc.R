@@ -46,14 +46,29 @@ europepmc_search <- function(gene, refine = NULL, size = 15) {
 
 # Build the Europe PMC query: the gene symbol, ANDed with a refinement term
 # (e.g. an rsID) when one is supplied. Both are quoted so multi-token terms
-# match as phrases.
+# match as phrases. `sort_date:y` is appended so results come back newest first;
+# without it Europe PMC ranks by relevance, which is not the "recent
+# literature" the card promises.
 europepmc_query <- function(gene, refine = NULL) {
   g <- trimws(as.character(gene))
-  if (is_blank(refine)) {
+  base <- if (is_blank(refine)) {
     paste0("\"", g, "\"")
   } else {
     paste0("\"", g, "\" AND \"", trimws(as.character(refine)), "\"")
   }
+  paste(base, "sort_date:y")
+}
+
+# Europe PMC titles carry inline markup (e.g. "<i>BRAF</i>") HTML-escaped
+# ("&lt;i&gt;BRAF&lt;/i&gt;"). The title cell renders with html = TRUE so the
+# tags display as intended (e.g. an italicized gene symbol) instead of showing
+# up as literal "<i>...</i>" text once the browser decodes the entities.
+europepmc_decode_title <- function(x) {
+  x <- gsub("&lt;", "<", x, fixed = TRUE)
+  x <- gsub("&gt;", ">", x, fixed = TRUE)
+  x <- gsub("&quot;", "\"", x, fixed = TRUE)
+  x <- gsub("&#39;|&apos;", "'", x)
+  gsub("&amp;", "&", x, fixed = TRUE)
 }
 
 # Pure parser: search results -> a citation data.frame.
@@ -66,7 +81,7 @@ europepmc_parse_results <- function(results) {
     )
   }
   data.frame(
-    title = field("title"),
+    title = europepmc_decode_title(field("title")),
     authors = field("authorString"),
     journal = field("journalTitle"),
     year = field("pubYear"),

@@ -71,7 +71,7 @@ mygene_parse_hit <- function(hit, fallback_symbol = NA_character_) {
     entrez = as.character(pluck_at(hit, "entrezgene", default = NA)),
     ensembl_gene = mygene_first(pluck_at(hit, "ensembl", "gene")),
     uniprot = mygene_first(pluck_at(hit, "uniprot", "Swiss-Prot")),
-    hgnc = as.character(pluck_at(hit, "HGNC", default = NA)),
+    hgnc = mygene_first(pluck_at(hit, "HGNC")),
     type_of_gene = pluck_at(hit, "type_of_gene", default = NA_character_)
   )
 }

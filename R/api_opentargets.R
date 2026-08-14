@@ -113,7 +113,14 @@ opentargets_drugs <- function(ensembl_id) {
     return(list(ok = FALSE, error = "Open Targets returned a query error."))
   }
 
-  known <- pluck_at(res$data, "data", "target", "drugAndClinicalCandidates")
+  target <- pluck_at(res$data, "data", "target")
+  if (is.null(target)) {
+    return(list(
+      ok = FALSE,
+      error = paste0("Open Targets has no record for '", ensembl_id, "'.")
+    ))
+  }
+  known <- pluck_at(target, "drugAndClinicalCandidates")
   rows <- pluck_at(known, "rows")
   if (is.null(rows) || length(rows) == 0) {
     return(list(
@@ -132,18 +139,28 @@ opentargets_drugs <- function(ensembl_id) {
 # Pure parser: known-drug rows ->
 # data.frame(drug, drug_id, drug_type, max_phase, disease).
 opentargets_parse_drugs <- function(rows) {
-  first_disease <- function(r) {
+  # Open Targets does not order/rank a drug's `diseases` array, so there is no
+  # single "lead" indication to pick out; list every indication the drug has
+  # been tried against instead of arbitrarily picking the first one.
+  disease_names <- function(r) {
     diseases <- pluck_at(r, "diseases")
     if (is.null(diseases) || length(diseases) == 0) {
       return(NA_character_)
     }
-    d <- diseases[[1]]
-    as.character(pluck_at(
-      d,
-      "disease",
-      "name",
-      default = pluck_at(d, "diseaseFromSource", default = NA_character_)
-    ))
+    nm <- vapply(
+      diseases,
+      function(d) {
+        as.character(pluck_at(
+          d,
+          "disease",
+          "name",
+          default = pluck_at(d, "diseaseFromSource", default = NA_character_)
+        ))
+      },
+      character(1)
+    )
+    nm <- nm[!is.na(nm) & nzchar(nm)]
+    if (length(nm) == 0) NA_character_ else paste(unique(nm), collapse = ", ")
   }
   data.frame(
     drug = vapply(
@@ -176,7 +193,7 @@ opentargets_parse_drugs <- function(rows) {
       },
       character(1)
     ),
-    disease = vapply(rows, first_disease, character(1)),
+    disease = vapply(rows, disease_names, character(1)),
     stringsAsFactors = FALSE
   )
 }
@@ -237,7 +254,14 @@ opentargets_pgx <- function(ensembl_id) {
     return(list(ok = FALSE, error = "Open Targets returned a query error."))
   }
 
-  rows <- pluck_at(res$data, "data", "target", "pharmacogenomics")
+  target <- pluck_at(res$data, "data", "target")
+  if (is.null(target)) {
+    return(list(
+      ok = FALSE,
+      error = paste0("Open Targets has no record for '", ensembl_id, "'.")
+    ))
+  }
+  rows <- pluck_at(target, "pharmacogenomics")
   if (is.null(rows) || length(rows) == 0) {
     return(list(
       ok = FALSE,

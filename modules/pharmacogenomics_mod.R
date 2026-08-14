@@ -43,7 +43,7 @@ pharmacogenomics_server <- function(id, resolved, variant_rsid) {
     output$source <- renderUI({
       res <- resolved()
       req(!is.null(res), isTRUE(res$ok))
-      vr_source_link(src_opentargets_gene(res$ensembl_gene), "Open Targets")
+      vr_source_link(src_opentargets_pgx(res$ensembl_gene), "Open Targets")
     })
 
     output$table <- reactable::renderReactable({
@@ -79,11 +79,8 @@ pharmacogenomics_server <- function(id, resolved, variant_rsid) {
                 return("—")
               }
               sprintf(
-                paste0(
-                  '<a href="https://www.ncbi.nlm.nih.gov/snp/%s"',
-                  ' target="_blank" rel="noopener noreferrer">%s</a>'
-                ),
-                value,
+                '<a href="%s" target="_blank" rel="noopener noreferrer">%s</a>',
+                src_dbsnp(value),
                 value
               )
             }

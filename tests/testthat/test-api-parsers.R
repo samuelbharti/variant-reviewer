@@ -183,13 +183,24 @@ test_that("europepmc_parse_results() builds a citation data.frame", {
   )
   expect_true(all(nzchar(df$title)))
   expect_true(is.integer(df$cited_by))
+  # Europe PMC escapes inline markup in titles (e.g. "&lt;i&gt;"); it should
+  # come back decoded so it renders as real tags, not literal "<i>" text.
+  expect_true(any(grepl("<i>BRAF V600E</i>", df$title, fixed = TRUE)))
+  expect_false(any(grepl("&lt;", df$title, fixed = TRUE)))
 })
 
-test_that("europepmc_query() quotes the gene and ANDs a refinement", {
-  expect_equal(europepmc_query("BRAF"), "\"BRAF\"")
+test_that("europepmc_decode_title() decodes HTML entities", {
+  expect_equal(europepmc_decode_title("&lt;i&gt;BRAF&lt;/i&gt;"), "<i>BRAF</i>")
+  expect_equal(europepmc_decode_title("A &amp; B"), "A & B")
+  expect_equal(europepmc_decode_title("5' &amp; 3&#39;"), "5' & 3'")
+  expect_true(is.na(europepmc_decode_title(NA_character_)))
+})
+
+test_that("europepmc_query() quotes the gene, ANDs a refinement, and sorts by date", {
+  expect_equal(europepmc_query("BRAF"), "\"BRAF\" sort_date:y")
   expect_equal(
     europepmc_query("BRAF", "rs113488022"),
-    "\"BRAF\" AND \"rs113488022\""
+    "\"BRAF\" AND \"rs113488022\" sort_date:y"
   )
 })
 
