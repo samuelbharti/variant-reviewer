@@ -29,7 +29,7 @@ variables:
     default: "0.1.0"
 
 # Exact-string find/replace operations. `from` is matched literally (not regex);
-# `to` may contain {{variables}}. A small, precise target list is deliberate —
+# `to` may contain {{variables}}. A small, precise target list is deliberate:
 # it is far more robust than find/replacing a generic word across prose.
 substitutions:
   - file: README.md

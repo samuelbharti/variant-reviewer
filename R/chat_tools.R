@@ -1,7 +1,7 @@
 # Formatters that turn each result card's data (the list its module returns)
 # into a compact text summary for the assistant's read_card tool. Kept pure and
-# Shiny-free so they are unit-testable. Each takes the card's value — a list with
-# ok = TRUE/FALSE, or NULL before a search — and returns a single string.
+# Shiny-free so they are unit-testable. Each takes the card's value (a list with
+# ok = TRUE/FALSE, or NULL before a search) and returns a single string.
 
 # Cards the assistant can read, id -> human label. The ids are the read_card
 # enum values and the keys the dashboard snapshot is stored under (server.R).

@@ -1,6 +1,6 @@
 # Evolutionary conservation card. Plots the variant position's conservation
 # metrics (phyloP, phastCons, GERP++, SiPhy) from dbNSFP via MyVariant, as
-# ranked bars — a higher rank means a more conserved, less tolerant position.
+# ranked bars, where a higher rank means a more conserved, less tolerant position.
 
 conservation_ui <- function(id) {
   ns <- NS(id)

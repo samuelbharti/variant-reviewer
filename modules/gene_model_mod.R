@@ -17,7 +17,7 @@ gene_model_ui <- function(id) {
 
 # resolved:    reactive() -> mygene_resolve() (uses the Ensembl gene id)
 # gnomad_data: reactive() -> gnomad_frequency() result. Its variant_id
-#              ("chrom-pos-ref-alt", GRCh38) places the variant on the model —
+#              ("chrom-pos-ref-alt", GRCh38) places the variant on the model,
 #              a more reliable source than VEP, which can time out.
 gene_model_server <- function(id, resolved, gnomad_data) {
   moduleServer(id, function(input, output, session) {

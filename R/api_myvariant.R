@@ -419,7 +419,7 @@ myvariant_parse_gene_variants <- function(hits) {
 }
 
 # Named character vector for a selectizeInput: value = rsID, name = display label
-# like "V600E — rs113488022 (Pathogenic)". Falls back to the rsID when there is
+# like "V600E, rs113488022 (Pathogenic)". Falls back to the rsID when there is
 # no amino-acid change (e.g. splice/frameshift variants).
 myvariant_variant_choices <- function(parsed, max_n = 100) {
   if (is.null(parsed) || !isTRUE(parsed$ok)) {
