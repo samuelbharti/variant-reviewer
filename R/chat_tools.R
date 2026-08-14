@@ -21,7 +21,11 @@ VR_CHAT_CARDS <- c(
   consequences = "Variant consequences (Ensembl VEP)",
   expression = "Tissue expression (GTEx)",
   interactions = "Protein interactions (STRING)",
-  diseases = "Disease associations (Open Targets)"
+  diseases = "Disease associations (Open Targets)",
+  phenotypes = "Phenotypes (HPO / Monarch)",
+  drugs = "Known drugs (Open Targets)",
+  pharmacogenomics = "Pharmacogenomics (Open Targets)",
+  literature = "Literature (Europe PMC)"
 )
 
 # Example prompts offered to the user (names are the short chip/card headings;
@@ -402,6 +406,129 @@ vr_chat_diseases <- function(res) {
   )
 }
 
+vr_chat_phenotypes <- function(res) {
+  g <- .vr_card_guard(res, "No phenotypes yet (needs a gene with an HGNC id).")
+  if (!is.null(g)) {
+    return(g)
+  }
+  df <- res$data
+  if (!is.data.frame(df) || nrow(df) == 0) {
+    return("No associated HPO phenotypes.")
+  }
+  rows <- .vr_rows(df, 10, function(i) {
+    paste0(df$phenotype[i], " (", df$hpo_id[i], ")")
+  })
+  extra <- if (!is_blank(res$count)) {
+    paste0(" (top ", nrow(df), " of ", res$count, ")")
+  } else {
+    ""
+  }
+  paste0(
+    "HPO phenotypes",
+    extra,
+    ": ",
+    paste(rows, collapse = "; "),
+    "."
+  )
+}
+
+vr_chat_drugs <- function(res) {
+  g <- .vr_card_guard(res, "No known drugs yet (needs a gene).")
+  if (!is.null(g)) {
+    return(g)
+  }
+  df <- res$data
+  if (!is.data.frame(df) || nrow(df) == 0) {
+    return("No known drugs or clinical candidates.")
+  }
+  rows <- .vr_rows(df, 10, function(i) {
+    paste0(
+      df$drug[i],
+      " (",
+      .vr_or(df$drug_type[i]),
+      ", ",
+      .vr_or(df$max_phase[i]),
+      if (!is_blank(df$disease[i])) paste0("; ", df$disease[i]) else "",
+      ")"
+    )
+  })
+  extra <- if (!is_blank(res$count)) {
+    paste0(" (top ", nrow(df), " of ", res$count, ")")
+  } else {
+    ""
+  }
+  paste0(
+    "Known drugs and clinical candidates",
+    extra,
+    ": ",
+    paste(rows, collapse = "; "),
+    "."
+  )
+}
+
+vr_chat_pharmacogenomics <- function(res) {
+  g <- .vr_card_guard(res, "No pharmacogenomics yet (needs a gene).")
+  if (!is.null(g)) {
+    return(g)
+  }
+  df <- res$data
+  if (!is.data.frame(df) || nrow(df) == 0) {
+    return("No pharmacogenomics annotations.")
+  }
+  rows <- .vr_rows(df, 8, function(i) {
+    paste0(
+      .vr_or(df$drug[i]),
+      if (!is_blank(df$rsid[i])) paste0(" @ ", df$rsid[i]) else "",
+      ": ",
+      .vr_or(df$phenotype[i]),
+      if (!is_blank(df$evidence[i])) {
+        paste0(" (evidence ", df$evidence[i], ")")
+      } else {
+        ""
+      }
+    )
+  })
+  paste0(
+    nrow(df),
+    " pharmacogenomics annotation(s). Top: ",
+    paste(rows, collapse = "; "),
+    "."
+  )
+}
+
+vr_chat_literature <- function(res) {
+  g <- .vr_card_guard(res, "No literature yet (needs a gene).")
+  if (!is.null(g)) {
+    return(g)
+  }
+  df <- res$data
+  if (!is.data.frame(df) || nrow(df) == 0) {
+    return("No publications found.")
+  }
+  rows <- .vr_rows(df, 5, function(i) {
+    paste0(
+      df$title[i],
+      " (",
+      .vr_or(df$journal[i]),
+      " ",
+      .vr_or(df$year[i]),
+      ")"
+    )
+  })
+  extra <- if (!is_blank(res$count)) {
+    paste0(" (top ", nrow(df), " of ", format(res$count, big.mark = ","), ")")
+  } else {
+    ""
+  }
+  paste0(
+    "Recent literature",
+    extra,
+    ": ",
+    paste(rows, collapse = "; "),
+    "."
+  )
+}
+
 vr_chat_landscape <- function(res) {
   g <- .vr_card_guard(res, "No variant landscape yet (needs a gene).")
   if (!is.null(g)) {
@@ -495,6 +622,10 @@ vr_chat_card_text <- function(card, data) {
     expression = vr_chat_expression,
     interactions = vr_chat_interactions,
     diseases = vr_chat_diseases,
+    phenotypes = vr_chat_phenotypes,
+    drugs = vr_chat_drugs,
+    pharmacogenomics = vr_chat_pharmacogenomics,
+    literature = vr_chat_literature,
     NULL
   )
   if (is.null(fn)) {

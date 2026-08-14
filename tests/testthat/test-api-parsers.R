@@ -17,6 +17,7 @@ test_that("mygene_parse_hit() normalizes a MyGene hit", {
   expect_equal(res$entrez, "7157")
   expect_equal(res$ensembl_gene, "ENSG00000141510")
   expect_equal(res$uniprot, "P04637")
+  expect_equal(res$hgnc, "11998")
   expect_match(res$summary, "tumor suppressor")
 })
 
@@ -138,6 +139,85 @@ test_that("opentargets_parse_rows() builds a disease/score data.frame", {
   expect_match(df$disease_id[1], "^MONDO_")
   expect_true(all(df$score >= 0 & df$score <= 1))
   expect_equal(df$score, sort(df$score, decreasing = TRUE)) # API returns sorted
+})
+
+test_that("opentargets_parse_drugs() builds a drug/phase/disease data.frame", {
+  rows <- read_fixture(
+    "opentargets_drugs_braf.json"
+  )$data$target$drugAndClinicalCandidates$rows
+  df <- opentargets_parse_drugs(rows)
+
+  expect_named(df, c("drug", "drug_id", "drug_type", "max_phase", "disease"))
+  expect_true(all(nzchar(df$drug)))
+  # Clinical stage is prettified from the API's SCREAMING_SNAKE form.
+  expect_true(any(grepl("^Phase ", df$max_phase)))
+  expect_false(any(grepl("_", df$max_phase))) # no PHASE_2 left
+})
+
+test_that("opentargets_pretty_phase() humanizes the stage enum", {
+  expect_equal(opentargets_pretty_phase("PHASE_2"), "Phase 2")
+  expect_equal(opentargets_pretty_phase("PRE_CLINICAL"), "Pre clinical")
+  expect_true(is.na(opentargets_pretty_phase("")))
+})
+
+test_that("opentargets_parse_pgx() builds a variant/drug/effect data.frame", {
+  rows <- read_fixture(
+    "opentargets_pgx_cyp2c19.json"
+  )$data$target$pharmacogenomics
+  df <- opentargets_parse_pgx(rows)
+
+  expect_named(df, c("rsid", "drug", "phenotype", "genotype", "evidence"))
+  expect_equal(nrow(df), length(rows))
+  # At least one row names a drug and carries an effect description.
+  expect_true(any(!is.na(df$drug)))
+  expect_true(any(nzchar(df$phenotype)))
+})
+
+test_that("europepmc_parse_results() builds a citation data.frame", {
+  results <- read_fixture("europepmc_braf_v600e.json")$resultList$result
+  df <- europepmc_parse_results(results)
+
+  expect_named(
+    df,
+    c("title", "authors", "journal", "year", "id", "source", "doi", "cited_by")
+  )
+  expect_true(all(nzchar(df$title)))
+  expect_true(is.integer(df$cited_by))
+  # Europe PMC escapes inline markup in titles (e.g. "&lt;i&gt;"); it should
+  # come back decoded so it renders as real tags, not literal "<i>" text.
+  expect_true(any(grepl("<i>BRAF V600E</i>", df$title, fixed = TRUE)))
+  expect_false(any(grepl("&lt;", df$title, fixed = TRUE)))
+})
+
+test_that("europepmc_decode_title() decodes HTML entities", {
+  expect_equal(europepmc_decode_title("&lt;i&gt;BRAF&lt;/i&gt;"), "<i>BRAF</i>")
+  expect_equal(europepmc_decode_title("A &amp; B"), "A & B")
+  expect_equal(europepmc_decode_title("5' &amp; 3&#39;"), "5' & 3'")
+  expect_true(is.na(europepmc_decode_title(NA_character_)))
+})
+
+test_that("europepmc_query() quotes the gene, ANDs a refinement, and sorts by date", {
+  expect_equal(europepmc_query("BRAF"), "\"BRAF\" sort_date:y")
+  expect_equal(
+    europepmc_query("BRAF", "rs113488022"),
+    "\"BRAF\" AND \"rs113488022\" sort_date:y"
+  )
+})
+
+test_that("monarch_parse_items() builds an HPO id/phenotype data.frame", {
+  items <- read_fixture("monarch_phenotypes_tp53.json")$items
+  df <- monarch_parse_items(items)
+
+  expect_s3_class(df, "data.frame")
+  expect_named(df, c("hpo_id", "phenotype"))
+  expect_true(all(grepl("^HP:", df$hpo_id)))
+  expect_true(all(nzchar(df$phenotype)))
+})
+
+test_that("monarch_hgnc_id() normalizes to the HGNC CURIE", {
+  expect_equal(monarch_hgnc_id("11998"), "HGNC:11998")
+  expect_equal(monarch_hgnc_id("hgnc:11998"), "HGNC:11998")
+  expect_equal(monarch_hgnc_id(" HGNC:11998 "), "HGNC:11998")
 })
 
 test_that("clinvar_parse_record() extracts classification and conditions", {

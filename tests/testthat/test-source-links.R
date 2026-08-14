@@ -31,6 +31,19 @@ test_that("source URL builders return the expected links", {
     "Variation/Explore\\?v=rs113488022"
   )
   expect_match(src_clinvar_variation("40389"), "clinvar/variation/40389/$")
+  expect_equal(
+    src_monarch_gene("11998"),
+    "https://monarchinitiative.org/HGNC:11998"
+  )
+  expect_equal(src_monarch_gene("HGNC:11998"), src_monarch_gene("11998"))
+  expect_match(
+    src_opentargets_drugs("ENSG00000157764"),
+    "target/ENSG00000157764/known_drugs$"
+  )
+  expect_match(
+    src_europepmc_search("\"BRAF\""),
+    "^https://europepmc.org/search\\?query=%22BRAF%22$"
+  )
 })
 
 test_that("source URL builders return NULL for blank identifiers", {

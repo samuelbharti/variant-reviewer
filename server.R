@@ -144,6 +144,14 @@ function(input, output, session) {
   gtex_data <- gtex_expression_server("gtex", resolved)
   string_data <- string_ppi_server("string_ppi", resolved)
   opentargets_data <- opentargets_server("opentargets", resolved)
+  phenotypes_data <- phenotypes_server("phenotypes", resolved)
+  drugs_data <- drugs_server("drugs", resolved)
+  pharmacogenomics_data <- pharmacogenomics_server(
+    "pharmacogenomics",
+    resolved,
+    variant_rsid
+  )
+  literature_data <- literature_server("literature", resolved, variant_rsid)
   external_links_server("links", resolved)
   # Visualization cards. The ancestry card reuses the shared gnomAD result (no
   # extra fetch); the gene model reuses the VEP result for the variant position.
@@ -243,6 +251,30 @@ function(input, output, session) {
       get = opentargets_data
     ),
     list(
+      id = "phenotypes",
+      label = "HPO phenotypes",
+      variant = FALSE,
+      get = phenotypes_data
+    ),
+    list(
+      id = "drugs",
+      label = "Open Targets drugs",
+      variant = FALSE,
+      get = drugs_data
+    ),
+    list(
+      id = "pharmacogenomics",
+      label = "Open Targets pharmacogenomics",
+      variant = FALSE,
+      get = pharmacogenomics_data
+    ),
+    list(
+      id = "literature",
+      label = "Europe PMC literature",
+      variant = FALSE,
+      get = literature_data
+    ),
+    list(
       id = "variant",
       label = "MyVariant annotation",
       variant = TRUE,
@@ -319,6 +351,10 @@ function(input, output, session) {
     expression = "gtex",
     interactions = "string_ppi",
     diseases = "opentargets",
+    phenotypes = "phenotypes",
+    drugs = "drugs",
+    pharmacogenomics = "pharmacogenomics",
+    literature = "literature",
     variant = "variant_summary",
     predictions = "predictions",
     protein = "protein_summary",

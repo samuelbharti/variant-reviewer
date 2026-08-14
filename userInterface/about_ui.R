@@ -68,6 +68,26 @@
     "Gene-disease association evidence."
   ),
   list(
+    "Phenotypes (HPO)",
+    "Monarch Initiative",
+    "Human Phenotype Ontology terms associated with the gene."
+  ),
+  list(
+    "Known drugs",
+    "Open Targets",
+    "Drugs and clinical candidates targeting the gene, with clinical stage."
+  ),
+  list(
+    "Pharmacogenomics",
+    "Open Targets",
+    "Variant and genotype effects on drug response, with evidence levels."
+  ),
+  list(
+    "Literature",
+    "Europe PMC",
+    "Recent publications for the gene, refined by the variant when loaded."
+  ),
+  list(
     "External links",
     "derived",
     "Deep links to external resources for the gene and variant."
