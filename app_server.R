@@ -461,6 +461,9 @@ function(input, output, session) {
   demo_guide <- vr_demo_tour()
   observeEvent(input$demo, {
     ex <- .gene_search_example
+    # Re-seed the demo snapshot in case the cache has been running long enough
+    # for the TTL or LRU to have dropped it, so clicking Review stays instant.
+    vr_seed_demo_cache()
     updateCheckboxGroupInput(
       session,
       "visible_cards",

@@ -97,14 +97,40 @@ docker run --rm -p 3838:3838 variant-reviewer
 
 Then open [http://localhost:3838](http://localhost:3838).
 
+## Deploy to Posit Connect Cloud
+
+Connect Cloud deploys from a public GitHub repo and needs two things: a primary
+file ([app.R](app.R)) and a [manifest.json](manifest.json). It does **not** read
+`renv.lock`, so the manifest is what pins the R version and every package.
+
+Regenerate the manifest whenever dependencies change, then commit it:
+
+```r
+rsconnect::writeManifest(appDir = ".", appPrimaryDoc = "app.R")
+```
+
+`renv::status()` must be clean first, or `writeManifest()` stops with "library
+and lockfile are out of sync".
+
+In the Connect Cloud dashboard, pick `app.R` as the primary file. The AI
+assistant needs no key to deploy: it is bring your own key, so each visitor
+supplies their own. Set `GEMINI_API_KEY`, `OPENAI_API_KEY` or
+`ANTHROPIC_API_KEY` as a variable there only if you want to fund a shared
+assistant, in which case every visitor's usage is billed to that key.
+
+[.rscignore](.rscignore) keeps the bundle small and, importantly, keeps
+`.Renviron` out of it. `rsconnect` does not honour `.gitignore`, so secrets have
+to be excluded there separately.
+
 ## Project structure
 
 ```txt
 .
 ├── _brand.yml              # Brand colors, fonts, logo (theming)
 ├── global.R                # Libraries and component loading
-├── ui.R                    # Navbar layout: Home dashboard + About page
-├── server.R                # Wires search -> resolved gene -> result modules
+├── app.R                   # Entry point: sources global.R, app_ui.R, app_server.R
+├── app_ui.R                # Navbar layout: Home dashboard + About page
+├── app_server.R            # Wires search -> resolved gene -> result modules
 ├── R/                      # Pure-R API clients + helpers (no Shiny)
 │   ├── api_http.R          # Shared httr2 GET wrapper (timeouts, retries, errors)
 │   ├── api_mygene.R        # Gene resolution
@@ -129,7 +155,7 @@ queried, the gene and variant are validated with
 [biobouncer](https://github.com/samuelbharti/biobouncer)'s offline `pattern`
 mode (gene against the HGNC grammar, rsIDs against dbSNP), so malformed input is
 rejected up front with an inline message rather than firing failing lookups.
-The same gate covers the assistant's `set_selection`. `server.R` resolves
+The same gate covers the assistant's `set_selection`. `app_server.R` resolves
 the gene **once** via MyGene (symbol → Ensembl / Entrez / UniProt) and shares
 that with every gene-level module, so each API is queried only when needed. API
 clients are pure R (in `R/`, individually testable); modules only orchestrate
@@ -167,7 +193,7 @@ server-side key via the matching environment variable (`GEMINI_API_KEY` /
 key field blank.
 
 The assistant is grounded in the dashboard through app-scoped tools (wired in
-[server.R](server.R), formatters in [R/chat_tools.R](R/chat_tools.R)):
+[app_server.R](app_server.R), formatters in [R/chat_tools.R](R/chat_tools.R)):
 
 - `get_current_selection`: the gene/variant currently loaded.
 - `read_card`: the data shown in a specific card (gene, variant, predictions,
@@ -189,7 +215,7 @@ renders a short setup panel and the rest of the app loads normally.
 ## Theming
 
 Branding lives in [`_brand.yml`](_brand.yml): colors, fonts, and logo in one
-place, applied by bslib via `bs_theme(brand = TRUE)` in [ui.R](ui.R).
+place, applied by bslib via `bs_theme(brand = TRUE)` in [app_ui.R](app_ui.R).
 
 ## Contributing
 

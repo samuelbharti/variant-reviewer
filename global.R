@@ -41,6 +41,12 @@ options(shinychat.tool_display = "none")
 
 source("R/load_components.R")
 
+# Warm the demo example (BRAF V600E) from its recorded snapshot so the guided
+# demo loads from memory rather than waiting on ~16 live API calls. No-op when
+# the snapshot is absent (a fresh checkout before dev/record_demo_cache.R has
+# run), so the app still works, the first demo is just cold.
+vr_seed_demo_cache()
+
 # Load data/connections
 # Example: app_data <- readRDS("data/app_data.rds")
 
