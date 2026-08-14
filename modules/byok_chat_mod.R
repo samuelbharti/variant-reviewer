@@ -71,7 +71,7 @@
 # The model preselected for a provider. "" means "leave the picker empty and let
 # the backend use the provider's own default". Gemini defaults to the cheapest
 # fast tier, which is plenty for summarizing the dashboard's cards.
-.byok_chat_provider_default_model <- function(provider) {
+.byok_chat_default_model <- function(provider) {
   switch(
     provider,
     gemini = "gemini-flash-lite-latest",
@@ -679,7 +679,7 @@ byok_chat_server <- function(
         ))
         return(invisible(NULL))
       }
-      default <- .byok_chat_provider_default_model(prov)
+      default <- .byok_chat_default_model(prov)
       ids <- .byok_chat_with_default(ids, default)
       keep <- trimws(isolate(input$model) %||% "")
       updateSelectizeInput(
@@ -717,7 +717,7 @@ byok_chat_server <- function(
       client(NULL)
       active_secret("")
       do_clear()
-      default <- .byok_chat_provider_default_model(prov)
+      default <- .byok_chat_default_model(prov)
       updateSelectizeInput(
         session,
         "model",
@@ -746,7 +746,7 @@ byok_chat_server <- function(
         if (!pasted && env_key_present(prov)) {
           model <- trimws(input$model %||% "")
           if (!nzchar(model)) {
-            model <- .byok_chat_provider_default_model(prov)
+            model <- .byok_chat_default_model(prov)
           }
           connect_with(
             prov,

@@ -110,10 +110,10 @@ test_that("server connects, streams, and enforces the turn limit (stubbed)", {
 
 test_that("gemini preselects the flash-lite model, other providers don't", {
   expect_identical(
-    .byok_chat_provider_default_model("gemini"),
+    .byok_chat_default_model("gemini"),
     "gemini-flash-lite-latest"
   )
-  expect_identical(.byok_chat_provider_default_model("openai"), "")
+  expect_identical(.byok_chat_default_model("openai"), "")
   # The default is offered in the curated suggestions too.
   expect_true(
     "gemini-flash-lite-latest" %in% .byok_chat_provider_models("gemini")

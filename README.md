@@ -69,6 +69,7 @@ install.packages(c(
   "shiny", "bslib", "brand.yml", "ggplot2",
   "httr2", "reactable", "jsonlite", "shinycssloaders",
   "r3dmol", # 3D structure card (AlphaFold viewer)
+  "cicerone", # guided Demo tour
   # AI assistant (optional; the app degrades gracefully without them)
   "ellmer", "shinychat"
 ))

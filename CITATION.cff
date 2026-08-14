@@ -1,17 +1,18 @@
 cff-version: 1.1.0
 message: "If you use this software, please cite it as below."
-title: "RShiny Template"
-version: "2.2"
-# doi: set this to your project's DOI (e.g. 10.5281/zenodo.xxxxx)
-doi: "10.5281/zenodo.19968600"
-date-released: "2026-06-29"
+title: "Variant Reviewer"
+version: "2.2.0" # keep in sync with app_version() in R/utils.R
+# doi: set this once a Zenodo release exists (e.g. 10.5281/zenodo.xxxxx)
+repository-code: "https://github.com/samuelbharti/variant-reviewer"
 authors:
   - family-names: Bharti
     given-names: Samuel
 keywords:
   - r
   - shiny
-  - template
+  - bioinformatics
+  - genomics
+  - variant-annotation
 license: MIT
 type: software
-abstract: "A lightweight R Shiny application template for building reproducible Shiny apps with renv and Docker support."
+abstract: "A lightweight R Shiny app for reviewing a gene or variant across MyGene, MyVariant, ClinVar, gnomAD, Ensembl VEP, GTEx, STRING, Open Targets, Monarch/HPO, Europe PMC, AlphaFold, and UniProt in one dashboard, with an optional bring-your-own-key AI assistant."

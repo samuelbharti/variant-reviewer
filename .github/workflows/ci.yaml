@@ -26,19 +26,31 @@ jobs:
       - uses: r-lib/actions/setup-r@v2
         with:
           use-public-rspm: true
+      # Restore from renv.lock, the same source of truth `renv::restore()`
+      # uses locally, so CI always has exactly what the app currently depends
+      # on -- rather than a hand-maintained package list that silently drifts
+      # out of date as dependencies are added (which is how r3dmol and
+      # biobouncer went missing from CI while still being used by the app).
+      #
+      # Trade-off: unlike setup-r-dependencies' pak-based installer,
+      # setup-renv does not auto-`apt-get` a package's system libraries, so a
+      # future dependency needing one Posit Package Manager doesn't already
+      # ship a binary for (use-public-rspm below covers everything currently
+      # in renv.lock) would fail to build here. If that happens, add an
+      # explicit sysreqs/apt-get step rather than reverting to a hand-listed
+      # package set.
+      - uses: r-lib/actions/setup-renv@v2
+      # lintr is a CI-only tool, not a runtime dependency of the app, so it is
+      # not part of renv.lock; add it on top of the restored library through
+      # the same cached, binary-preferring installer the app job used to
+      # install everything with, rather than a bare install.packages() call.
+      # packages: must be overridden -- it defaults to "deps::., any::sessioninfo",
+      # and deps::. resolves dependencies from a DESCRIPTION file, which this
+      # project (an app, not a package) does not have.
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          packages: |
-            any::lintr
-            any::shiny
-            any::bslib
-            any::brand.yml
-            any::ggplot2
-            any::httr2
-            any::reactable
-            any::jsonlite
-            any::shinycssloaders
-            any::cicerone
+          packages: any::sessioninfo
+          extra-packages: any::lintr
       - name: Lint
         run: |
           lints <- lintr::lint_dir(".")
@@ -63,20 +75,10 @@ jobs:
       - uses: r-lib/actions/setup-r@v2
         with:
           use-public-rspm: true
-      - uses: r-lib/actions/setup-r-dependencies@v2
-        with:
-          packages: |
-            any::shiny
-            any::bslib
-            any::brand.yml
-            any::ggplot2
-            any::httr2
-            any::reactable
-            any::jsonlite
-            any::shinycssloaders
-            any::cicerone
-            any::shinytest2
-            any::testthat
+      # See the lint job above: restoring from renv.lock keeps this in step
+      # with the app's actual dependencies (shinytest2 and testthat, used by
+      # the smoke test below, are already recorded there too).
+      - uses: r-lib/actions/setup-renv@v2
       - name: Run tests (app smoke test)
         run: shiny::runTests(".", assert = TRUE)
         shell: Rscript {0}
