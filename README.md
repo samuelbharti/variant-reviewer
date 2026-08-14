@@ -1,5 +1,7 @@
 # Variant Reviewer
 
+[![DOI](https://zenodo.org/badge/1285502737.svg)](https://doi.org/10.5281/zenodo.21934011)
+
 Variant Reviewer is a Shiny app that helps you interpret a gene or a variant.
 Enter a gene symbol, a variant, or both. The dashboard then shows what the gene
 does, where the body expresses it, what it interacts with, and protein-level
