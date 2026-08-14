@@ -81,8 +81,12 @@ gnomad_frequency <- function(rsid, dataset = GNOMAD_DATASET) {
 # dropped (they carry an underscore) so only the main ancestry groups remain.
 # Returns a data.frame(pop, label, ac, an, af) sorted by frequency, or NULL.
 gnomad_parse_populations <- function(exome_pops, genome_pops) {
-  acc <- list()
+  # Builds and returns its own local accumulator, rather than mutating an
+  # outer-scope variable with `<<-`. Exome and genome rows are just two lists
+  # of the same shape, so concatenating them up front means one pass instead
+  # of one call (and one reassignment) per source.
   add <- function(pops) {
+    acc <- list()
     for (p in pops) {
       id <- pluck_at(p, "id")
       # Keep only the known genetic-ancestry groups: this drops the sex
@@ -94,11 +98,11 @@ gnomad_parse_populations <- function(exome_pops, genome_pops) {
       ac <- as.numeric(pluck_at(p, "ac", default = 0))
       an <- as.numeric(pluck_at(p, "an", default = 0))
       prev <- acc[[id]] %||% c(0, 0)
-      acc[[id]] <<- c(prev[[1]] + ac, prev[[2]] + an)
+      acc[[id]] <- c(prev[[1]] + ac, prev[[2]] + an)
     }
+    acc
   }
-  add(exome_pops)
-  add(genome_pops)
+  acc <- add(c(exome_pops, genome_pops))
   if (length(acc) == 0) {
     return(NULL)
   }
