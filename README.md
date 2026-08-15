@@ -252,16 +252,15 @@ All branding (colors, fonts, and the logo) lives in one file:
 
 ## Contributing
 
-I maintain this on my own, and issues and pull requests are welcome. Read
-[CONTRIBUTING.md](CONTRIBUTING.md) first, and please follow the
-[Code of Conduct](CODE_OF_CONDUCT.md).
+Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md)
+first, and please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-Found a security problem? Do not open a public issue. Email me instead, as
-[SECURITY.md](SECURITY.md) describes.
+For a security problem, do not open a public issue: [SECURITY.md](SECURITY.md)
+explains how to report it privately.
 
 ## Author
 
-I am **Samuel Bharti**. I wrote this app and I maintain it on my own.
+Samuel Bharti, sole author and maintainer.
 
 - Email: <samuelbharti.io@gmail.com>
 - Web: [samuelbharti.com](https://www.samuelbharti.com)
