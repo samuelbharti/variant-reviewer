@@ -58,7 +58,5 @@ graphics-device font.
 
 ## Notes
 
-- `_brand.yml` is app content, not template scaffolding. `dev/use_template.R`
-  keeps this file, and only updates `meta.name` to your project name.
 - Keep `_brand.yml` in version control, so the look of the app stays
   reproducible.

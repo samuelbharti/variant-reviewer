@@ -1,10 +1,8 @@
 # Variant Reviewer
 
-<!-- template:strip:start -->
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21934011-1682D4)](https://doi.org/10.5281/zenodo.21934011)
 
 By [Samuel Bharti](https://www.samuelbharti.com)
-<!-- template:strip:end -->
 
 Variant Reviewer is a Shiny app that helps you interpret a gene or a variant.
 Enter a gene symbol, a variant, or both. The dashboard then shows what the gene
@@ -261,7 +259,6 @@ I maintain this on my own, and issues and pull requests are welcome. Read
 Found a security problem? Do not open a public issue. Email me instead, as
 [SECURITY.md](SECURITY.md) describes.
 
-<!-- template:strip:start -->
 ## Author
 
 I am **Samuel Bharti**. I wrote this app and I maintain it on my own.
@@ -279,7 +276,6 @@ latest version; to cite one specific version, use that version's DOI from the
 
 [CITATION.cff](CITATION.cff) holds the full metadata, and
 [CITATION.md](CITATION.md) gives a ready-made text and BibTeX entry.
-<!-- template:strip:end -->
 
 ## License
 

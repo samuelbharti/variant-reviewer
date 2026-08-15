@@ -52,9 +52,3 @@ end-to-end behavior. If behavior changed, update the README too.
 
 The `CI` workflow runs the same lint, format check, tests, and Markdown lint on
 every push and pull request.
-
-## A note on the template
-
-This repository doubles as a project template. `template.yml` is the manifest
-of that template, and `dev/use_template.R` applies it. If you change a template
-decision, change `template.yml` and not the engine.
