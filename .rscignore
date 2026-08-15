@@ -18,11 +18,11 @@ skills
 CHANGELOG.md
 CONTRIBUTING.md
 CODE_OF_CONDUCT.md
+SECURITY.md
 Dockerfile
 .dockerignore
 .pre-commit-config.yaml
 air.toml
-template.yml
 .lintr
 .markdownlint.json
 .markdownlintignore
