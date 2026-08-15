@@ -4,6 +4,29 @@ All notable changes to this project should be documented in this file.
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-08-15
+
+### Fixed
+
+- `renv.lock` and `manifest.json` recorded `biobouncer` with the R-universe URL
+  as its repository. Connect Cloud installs from CRAN and Bioconductor and
+  cannot read that, so deployment failed. Both files now record the public
+  GitHub source, pinned to the commit of the newest R-universe build, and the
+  version moves from 0.1.2 to 0.1.4.
+- The Zenodo DOI badge did not render. GitHub proxies README images through
+  camo, and Zenodo answers camo with a 429. It is now a shields.io badge with
+  the same DOI and link target.
+
+### Changed
+
+- Shortened the Code of Conduct, which still carried the `[INSERT CONTACT
+  METHOD]` placeholder, and rewrote the contributing guide. It had told
+  contributors to branch from and target `dev`, a branch that does not exist.
+- Added a security policy, and an Author section to the README.
+- Removed the leftover template machinery (`template.yml`,
+  `dev/use_template.R`) inherited from the template this repo was generated
+  from. Its substitution targets no longer matched this repository.
+
 ## [2.3.0] - 2026-08-14
 
 - Added Posit Connect Cloud deployment support: an `app.R` entry point, a

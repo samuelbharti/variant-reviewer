@@ -260,7 +260,7 @@ explains how to report it privately.
 
 ## Author
 
-Samuel Bharti, sole author and maintainer.
+Samuel Bharti
 
 - Email: <samuelbharti.io@gmail.com>
 - Web: [samuelbharti.com](https://www.samuelbharti.com)

@@ -4,7 +4,7 @@ Please cite this repository when using it in publications or derivative projects
 
 Recommended citation (APA):
 
-Bharti, S. (2026). *Variant Reviewer* (version 2.3.0) [Software]. Zenodo. <https://doi.org/10.5281/zenodo.21934012>
+Bharti, S. (2026). *Variant Reviewer* (version 2.3.1) [Software]. Zenodo. <https://doi.org/10.5281/zenodo.21934012>
 
 BibTeX:
 
@@ -12,7 +12,7 @@ BibTeX:
 @software{variant_reviewer_2026,
   author = {Bharti, Samuel},
   title = {Variant Reviewer},
-  version = {2.3.0},
+  version = {2.3.1},
   doi = {10.5281/zenodo.21934012},
   url = {https://doi.org/10.5281/zenodo.21934012}
 }
