@@ -1,6 +1,10 @@
 # Variant Reviewer
 
-[![DOI](https://zenodo.org/badge/1285502737.svg)](https://doi.org/10.5281/zenodo.21934011)
+<!-- template:strip:start -->
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21934011-1682D4)](https://doi.org/10.5281/zenodo.21934011)
+
+By [Samuel Bharti](https://www.samuelbharti.com)
+<!-- template:strip:end -->
 
 Variant Reviewer is a Shiny app that helps you interpret a gene or a variant.
 Enter a gene symbol, a variant, or both. The dashboard then shows what the gene
@@ -250,4 +254,33 @@ All branding (colors, fonts, and the logo) lives in one file:
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+I maintain this on my own, and issues and pull requests are welcome. Read
+[CONTRIBUTING.md](CONTRIBUTING.md) first, and please follow the
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
+Found a security problem? Do not open a public issue. Email me instead, as
+[SECURITY.md](SECURITY.md) describes.
+
+<!-- template:strip:start -->
+## Author
+
+I am **Samuel Bharti**. I wrote this app and I maintain it on my own.
+
+- Email: <samuelbharti.io@gmail.com>
+- Web: [samuelbharti.com](https://www.samuelbharti.com)
+- ORCID: [0000-0003-4190-7058](https://orcid.org/0000-0003-4190-7058)
+- GitHub: [@samuelbharti](https://github.com/samuelbharti)
+
+## Citation
+
+Zenodo archives each release. The badge at the top of this file resolves to the
+latest version; to cite one specific version, use that version's DOI from the
+[Zenodo record](https://doi.org/10.5281/zenodo.21934011).
+
+[CITATION.cff](CITATION.cff) holds the full metadata, and
+[CITATION.md](CITATION.md) gives a ready-made text and BibTeX entry.
+<!-- template:strip:end -->
+
+## License
+
+[MIT](LICENSE). Copyright (c) 2026 Samuel Bharti.
