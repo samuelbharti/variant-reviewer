@@ -4,6 +4,21 @@ All notable changes to this project should be documented in this file.
 
 ## [Unreleased]
 
+## [2.3.2] - 2026-09-10
+
+### Added
+
+- A demo clip at `assets/demo.mp4`, for the Demo button in the bioinformatics
+  gallery. `assets` is in `.rscignore`, so the clip stays out of the manifest
+  and out of a deployment.
+
+### Fixed
+
+- `.Rprofile` stopped R at startup on Connect Cloud. `is.na(repos["biobouncer"])`
+  is `logical(0)` when no repositories are set, and `if (logical(0))` is an
+  error. The test is now `!("biobouncer" %in% names(repos))`. The gallery had
+  carried this as a local patch since v2.3.1.
+
 ## [2.3.1] - 2026-08-15
 
 ### Fixed
