@@ -4,6 +4,20 @@ All notable changes to this project should be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- `CITATION.cff` and `CITATION.md` gave the version DOI for 2.3.2 as the DOI to
+  cite, on files that both declare version 2.3.3. Anyone citing the app was
+  pinned to a release two versions old. Both now give the concept DOI,
+  `10.5281/zenodo.21934011`, which resolves to the latest version and matches
+  the README badge.
+
+### Added
+
+- `CITATION.cff` lists the DOI of every released version, so citing one
+  specific version no longer means looking the record up on Zenodo. It also
+  carries `date-released` and an ORCID, and moves to CFF 1.2.0.
+
 ## [2.3.3] - 2026-09-10
 
 ### Added
