@@ -4,7 +4,7 @@ Please cite this repository when using it in publications or derivative projects
 
 Recommended citation (APA):
 
-Bharti, S. (2026). *Variant Reviewer* (version 2.3.3) [Software]. Zenodo. <https://doi.org/10.5281/zenodo.22685108>
+Bharti, S. (2026). *Variant Reviewer* (version 2.3.3) [Software]. Zenodo. <https://doi.org/10.5281/zenodo.21934011>
 
 BibTeX:
 
@@ -13,15 +13,16 @@ BibTeX:
   author = {Bharti, Samuel},
   title = {Variant Reviewer},
   version = {2.3.3},
-  doi = {10.5281/zenodo.22685108},
-  url = {https://doi.org/10.5281/zenodo.22685108}
+  date = {2026-09-10},
+  doi = {10.5281/zenodo.21934011},
+  url = {https://doi.org/10.5281/zenodo.21934011}
 }
 ```
 
 Notes:
 
-- The DOI above (`10.5281/zenodo.22685108`) is the version DOI for 2.3.2. To
-  cite the software in general, use the concept DOI `10.5281/zenodo.21934011`,
-  which always resolves to the latest version.
+- `10.5281/zenodo.21934011` is the concept DOI, and it always resolves to the
+  latest version. To cite one specific version, use that version's DOI from the
+  Zenodo record. `CITATION.cff` lists the DOI of each version.
 - For automated citation support on GitHub, keep a `CITATION.cff` in the
   repository root.
