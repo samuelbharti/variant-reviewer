@@ -208,6 +208,128 @@ test_that("myvariant_distinct_alleles() merges one indel written two ways", {
   expect_true(.mv_same_change(snv("T"), snv("T")))
 })
 
+test_that("myvariant_distinct_alleles() drops records that are not alleles", {
+  hit <- function(ref, alt) {
+    list(
+      `_id` = paste0("chr1:g.169549811", ref, ">", alt),
+      chrom = "1",
+      vcf = list(position = "169549811", ref = ref, alt = alt)
+    )
+  }
+  # rs6025 as MyVariant has it: two real alleles, a ref==alt record, and a
+  # T>C whose ref is not the reference base the others share.
+  kept <- myvariant_distinct_alleles(list(
+    hit("C", "A"),
+    hit("T", "C"),
+    hit("C", "T"),
+    hit("C", "C")
+  ))
+  ids <- vapply(kept, function(h) h$`_id`, character(1))
+  expect_equal(ids, c("chr1:g.169549811C>A", "chr1:g.169549811C>T"))
+
+  # rs429358: the T>T record goes, so one allele is left.
+  apoe <- myvariant_pick_allele(
+    list(hit("T", "C"), hit("T", "T")),
+    "rs429358",
+    "No annotation found for"
+  )
+  expect_true(apoe$ok)
+})
+
+test_that("myvariant_hgvsp() takes the protein change most transcripts give", {
+  # rs7412 (APOE) with no dbNSFP block: snpEff lists the long isoform
+  # NM_001302688 first.
+  ann <- lapply(
+    c("p.Arg202Cys", rep("p.Arg176Cys", 4)),
+    function(p) list(hgvs_p = p)
+  )
+  expect_equal(myvariant_hgvsp(list(snpeff = list(ann = ann))), "p.Arg176Cys")
+})
+
+test_that("myvariant_hgvsp() numbers the change on the reviewed UniProt protein", {
+  # TP53 R175H: dbNSFP lists a short isoform (R136H) first, and more of its
+  # transcripts give R136 than R175. The canonical P04637 entry gives 175.
+  hit <- list(
+    dbnsfp = list(
+      aa = list(ref = "R", alt = "H", pos = list(136L, 175L, 136L, 43L)),
+      uniprot = list(
+        list(acc = "P04637-4", entry = "P53_HUMAN"),
+        list(acc = "P04637", entry = "P53_HUMAN"),
+        list(acc = "P04637-4", entry = "P53_HUMAN"),
+        list(acc = "E7ESS1", entry = "E7ESS1_HUMAN")
+      ),
+      hgvsp = list("p.Arg136His", "p.Arg175His", "p.Arg43His", "p.R175H")
+    )
+  )
+  expect_equal(.mv_swissprot_pos(hit), 175L)
+  expect_equal(myvariant_hgvsp(hit), "p.Arg175His")
+  expect_equal(.mv_aa_label(hit$dbnsfp$aa, .mv_swissprot_pos(hit)), "R175H")
+})
+
+test_that("a hit's ClinVar block is dropped when it is another allele's", {
+  # MyVariant files BRCA1 5382insC's ClinVar record under a TG duplication
+  # with a different rsID.
+  hit <- list(
+    `_id` = "chr17:g.43057062_43057063dup",
+    dbsnp = list(rsid = "rs2051500205"),
+    clinvar = list(
+      rsid = "rs80357906",
+      variant_id = 17677,
+      gene = list(symbol = "BRCA1"),
+      rcv = list(clinical_significance = "Pathogenic")
+    )
+  )
+  res <- myvariant_parse_hit(hit)
+  expect_equal(res$rsid, "rs2051500205")
+  expect_true(is.na(res$clinvar_id))
+  expect_true(is.na(res$clinvar_significance))
+  expect_true(is.na(res$gene))
+
+  # The same block on a record with no dbSNP rsID is kept.
+  hit$dbsnp <- NULL
+  res <- myvariant_parse_hit(hit)
+  expect_equal(res$clinvar_id, "17677")
+  expect_equal(res$gene, "BRCA1")
+})
+
+test_that("myvariant_gene() falls back to snpEff for indels", {
+  hit <- list(snpeff = list(ann = list(genename = "GJB2", hgvs_c = "c.30del")))
+  expect_equal(myvariant_gene(hit), "GJB2")
+})
+
+test_that("myvariant_pick_allele() keeps only records that are the rsID", {
+  # rs80338939 also matches a record that carries it in another field.
+  hits <- list(
+    list(`_id` = "chr13:g.20189547del", clinvar = list(rsid = "rs80338939")),
+    list(`_id` = "chr13:g.20189548del")
+  )
+  res <- myvariant_pick_allele(hits, "rs80338939", "No annotation found for")
+  expect_true(res$ok)
+  expect_equal(res$hit$`_id`, "chr13:g.20189547del")
+
+  none <- myvariant_pick_allele(
+    list(),
+    "NM_004333.6:c.1799T>C",
+    "No annotation found for"
+  )
+  expect_match(none$error, "try the GRCh38 genomic HGVS or the rsID")
+})
+
+test_that("vr_left_align() moves an indel to its leftmost position", {
+  # BRCA2 c.5073del: MyVariant has 13-32339427-AA-A; the six bases before it
+  # are CAAAAA, so gnomAD's 13-32339421-CA-C is the leftmost form.
+  moved <- vr_left_align(32339427L, "AA", "A", "GTCAAAAA")
+  expect_equal(moved, list(pos = 32339421L, ref = "CA", alt = "C"))
+  # CFTR F508del written at the right end of its repeat.
+  moved <- vr_left_align(117559591L, "TCTT", "T", "GA")
+  expect_equal(moved, list(pos = 117559590L, ref = "ATCT", alt = "A"))
+  # Already leftmost: unchanged.
+  moved <- vr_left_align(117559590L, "ATCT", "A", "G")
+  expect_equal(moved, list(pos = 117559590L, ref = "ATCT", alt = "A"))
+  # The repeat runs past the bases given.
+  expect_null(vr_left_align(100L, "AA", "A", "AAAA"))
+})
+
 test_that("vr_variant_allele() passes one allele and flags an unpicked rsID", {
   expect_equal(vr_variant_allele(list(ok = TRUE, id = "x"))$id, "x")
   expect_true(
@@ -416,6 +538,33 @@ test_that("clinvar_pick_uid() keeps the record for the allele's cDNA change", {
   # With no cDNA change known, the protein change is used.
   expect_equal(clinvar_pick_uid(ids, records, protein = "p.Val600Glu"), "13961")
   expect_null(clinvar_pick_uid(ids, records))
+
+  # A haplotype that contains the allele is not the allele's own record
+  # (MyVariant points rs7412 at APOE's c.[526C>T;725G>A]).
+  haplotype <- list(title = "NM_000041.4(APOE):c.[526C>T;725G>A]")
+  own <- list(title = "NM_000041.4(APOE):c.526C>T (p.Arg176Cys)")
+  expect_null(clinvar_pick_uid("441265", list(haplotype), cdna = "c.526C>T"))
+  expect_equal(
+    clinvar_pick_uid(c("441265", "17848"), list(haplotype, own), "c.526C>T"),
+    "17848"
+  )
+
+  # GJB2 35delG: snpEff names it c.30del and ClinVar c.35del, one deletion
+  # in a run of Cs. For an indel the protein change can stand in.
+  gjb2 <- list(title = "NM_004004.6(GJB2):c.35del (p.Gly12fs)")
+  expect_null(
+    clinvar_pick_uid("17004", list(gjb2), "c.30del", "p.Gly12fs")
+  )
+  expect_equal(
+    clinvar_pick_uid(
+      "17004",
+      list(gjb2),
+      "c.30del",
+      "p.Gly12fs",
+      protein_too = TRUE
+    ),
+    "17004"
+  )
 })
 
 test_that("gnomad_freq_part() normalizes a frequency block and handles NULL", {

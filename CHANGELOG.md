@@ -21,8 +21,31 @@ All notable changes to this project should be documented in this file.
   MyVariant needs it in quotes.
 - The protein change could name a minor isoform (p.Val640Glu for BRAF V600E).
   It now comes from snpEff, on the RefSeq transcript.
-- MyVariant can hold one indel twice, written at both ends of a repeat. Those
-  now count as one allele (CFTR F508del).
+- MyVariant can hold one indel twice, shifted a few bases inside a repeat.
+  Those now count as one allele (CFTR F508del). Records that are not alleles
+  (ref equal to alt, or a ref that is not the reference base) are dropped, so
+  APOE rs429358 loads again.
+- gnomAD could say it had no record for an indel it lists further left in a
+  repeat (BRCA2 c.5073del). The indel is now moved to its leftmost position
+  against the reference before gnomAD is asked again, and when that cannot be
+  checked the card says so, instead of claiming the variant is absent.
+- ClinVar could show a haplotype record that contains the allele, not the
+  allele's own record (APOE rs7412). Records are now checked against the
+  allele's cDNA change. When an allele has no cDNA or protein change to match
+  on, the card says the records could not be matched, not that there are none.
+- The protein change is numbered on the reviewed UniProt protein, the one the
+  protein and structure cards use, not on whichever transcript was listed
+  first (TP53 R175H, not R136H; APOE R176C, not R202C). The variant
+  suggestions use the same numbering.
+- An indel in a repeat can have a different cDNA name in snpEff and ClinVar
+  (GJB2 35delG is c.30del and c.35del), so its ClinVar record is also matched
+  on its protein change.
+- MyVariant can file one allele's ClinVar record under another allele (BRCA1
+  5382insC under a TG duplication). A ClinVar block whose rsID differs from
+  the record's own is now ignored. An rsID search also keeps only records
+  that carry that rsID.
+- Indels and non-coding variants now get their gene from snpEff or ClinVar,
+  so a variant searched on its own still fills the gene cards.
 
 ## [2.3.3] - 2026-09-10
 

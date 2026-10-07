@@ -1,5 +1,5 @@
 {
-  "took": 6,
+  "took": 18,
   "total": 1,
   "max_score": 1.0,
   "hits": [
@@ -9,6 +9,9 @@
       "chrom": "7",
       "clinvar": {
         "_license": "http://bit.ly/2SQdcI0",
+        "gene": {
+          "symbol": "BRAF"
+        },
         "rcv": [
           {
             "clinical_significance": "Pathogenic"
@@ -67,6 +70,34 @@
       },
       "dbnsfp": {
         "_license": "http://bit.ly/2VLnQBz",
+        "aa": {
+          "alt": "E",
+          "codon_degeneracy": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "codonpos": [
+            2,
+            2,
+            2,
+            2
+          ],
+          "pos": [
+            600,
+            640,
+            600,
+            640
+          ],
+          "ref": "V",
+          "refcodon": [
+            "GTG",
+            "GTG",
+            "GTG",
+            "GTG"
+          ]
+        },
         "cadd": {
           "phred": 29.8
         },
@@ -86,6 +117,24 @@
           "p.Val600Glu",
           "p.Val207Glu",
           "p.V600E"
+        ],
+        "uniprot": [
+          {
+            "acc": "H7C560",
+            "entry": "H7C560_HUMAN"
+          },
+          {
+            "acc": "A0A2R8Y8E0",
+            "entry": "A0A2R8Y8E0_HUMAN"
+          },
+          {
+            "acc": "P15056",
+            "entry": "BRAF_HUMAN"
+          },
+          {
+            "acc": "A0A2U3TZI2",
+            "entry": "A0A2U3TZI2_HUMAN"
+          }
         ]
       },
       "dbsnp": {
@@ -95,6 +144,7 @@
       "snpeff": {
         "_license": "http://bit.ly/2suyRKt",
         "ann": {
+          "genename": "BRAF",
           "hgvs_c": "c.1799T>A",
           "hgvs_p": "p.Val600Glu"
         }

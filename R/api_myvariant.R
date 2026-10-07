@@ -49,11 +49,16 @@ myvariant_fetch_allele <- function(variant, fields, not_found) {
   allele_fields <- c(
     "chrom",
     "vcf",
+    "dbsnp.rsid",
     "clinvar.variant_id",
     "clinvar.rsid",
+    "clinvar.gene.symbol",
     "dbnsfp.genename",
+    "dbnsfp.aa",
+    "dbnsfp.uniprot",
     "dbnsfp.hgvsp",
     "dbnsfp.hgvsc",
+    "snpeff.ann.genename",
     "snpeff.ann.hgvs_p",
     "snpeff.ann.hgvs_c"
   )
@@ -78,7 +83,34 @@ myvariant_fetch_allele <- function(variant, fields, not_found) {
 # every allele when there are several.
 myvariant_pick_allele <- function(hits, term, not_found) {
   if (is.null(hits) || length(hits) == 0) {
-    return(list(ok = FALSE, error = paste0(not_found, " '", term, "'.")))
+    hint <- if (grepl(":[cnp]\\.", term)) {
+      paste(
+        " MyVariant finds transcript HGVS only for some variants;",
+        "try the GRCh38 genomic HGVS or the rsID."
+      )
+    } else {
+      ""
+    }
+    return(list(ok = FALSE, error = paste0(not_found, " '", term, "'.", hint)))
+  }
+  # A search for an rsID also matches records that carry it in some other
+  # field (an EVS rsID, say) but are another variant. Keep the records that
+  # are this rsID, unless that leaves none (an rsID merged into another one).
+  if (grepl("^rs[0-9]+$", term, ignore.case = TRUE)) {
+    own <- vapply(
+      hits,
+      function(h) {
+        ids <- tolower(c(
+          unlist(pluck_at(h, "dbsnp", "rsid"), use.names = FALSE),
+          unlist(pluck_at(h, "clinvar", "rsid"), use.names = FALSE)
+        ))
+        tolower(term) %in% ids
+      },
+      logical(1)
+    )
+    if (any(own)) {
+      hits <- hits[own]
+    }
   }
   hits <- myvariant_distinct_alleles(hits)
   if (length(hits) == 1) {
@@ -98,11 +130,7 @@ myvariant_pick_allele <- function(hits, term, not_found) {
     alleles$id,
     paste0(alleles$hgvsp, " (", alleles$id, ")")
   )
-  genes <- unique(stats::na.omit(vapply(
-    hits,
-    function(h) mygene_first(pluck_at(h, "dbnsfp", "genename")),
-    character(1)
-  )))
+  genes <- unique(stats::na.omit(vapply(hits, myvariant_gene, character(1))))
   list(
     ok = FALSE,
     ambiguous = TRUE,
@@ -121,13 +149,48 @@ myvariant_pick_allele <- function(hits, term, not_found) {
   )
 }
 
-# MyVariant can hold one indel twice, shifted left and right inside a repeat:
-# CFTR F508del is both 7-117559590-ATCT-A and 7-117559591-TCTT-T. Those are one
-# allele, so they are merged, keeping the hit with a ClinVar record (the one
-# ClinVar and gnomAD also use). Hits without VCF fields are kept as they are.
+# The real, distinct alleles among an rsID's hits.
+#
+# Two kinds of hit are not alleles and are dropped: a record whose ref equals
+# its alt (ClinVar keeps some for the reference allele, such as APOE's
+# c.388=), and a record whose ref disagrees with the ref most hits at that
+# position share (rs6025 has a T>C where the reference base is C).
+#
+# MyVariant can also hold one indel twice, shifted a few bases inside a
+# repeat: CFTR F508del is both 7-117559590-ATCT-A and 7-117559591-TCTT-T.
+# Those are merged, keeping the hit with a ClinVar record (the one ClinVar and
+# gnomAD also use). Only shifts that keep the two records touching are seen
+# (see .mv_same_change()). Hits without VCF fields are kept as they are.
 myvariant_distinct_alleles <- function(hits) {
+  vcfs <- lapply(hits, myvariant_vcf)
+  site <- vapply(
+    vcfs,
+    function(v) if (is.null(v)) NA_character_ else paste(v$chrom, v$pos),
+    character(1)
+  )
+  real <- vapply(
+    seq_along(hits),
+    function(i) {
+      v <- vcfs[[i]]
+      if (is.null(v)) {
+        return(TRUE)
+      }
+      if (identical(v$ref, v$alt)) {
+        return(FALSE)
+      }
+      refs <- vapply(
+        vcfs[site %in% site[[i]]],
+        function(s) substr(s$ref, 1, 1),
+        character(1)
+      )
+      counts <- table(refs)
+      top <- names(counts)[counts == max(counts)]
+      length(top) > 1 || identical(substr(v$ref, 1, 1), top)
+    },
+    logical(1)
+  )
   kept <- list()
-  for (hit in hits) {
+  for (hit in hits[real]) {
     vcf <- myvariant_vcf(hit)
     same <- which(vapply(
       kept,
@@ -156,6 +219,9 @@ myvariant_distinct_alleles <- function(hits) {
   }
   start <- min(a$pos, b$pos)
   end <- max(a$pos + nchar(a$ref), b$pos + nchar(b$ref)) - 1
+  if (end - start + 1 > nchar(a$ref) + nchar(b$ref)) {
+    return(FALSE)
+  }
   ref <- rep(NA_character_, end - start + 1)
   for (r in list(a, b)) {
     at <- r$pos - start + seq_len(nchar(r$ref))
@@ -276,19 +342,40 @@ vr_allele_unplaced <- function(source) {
 # find this same allele: its ClinVar variation id, its VCF id (for gnomAD and
 # VEP), and every spelling of its cDNA and protein change.
 myvariant_parse_hit <- function(hit, term = NA_character_) {
+  clinvar_ok <- .mv_clinvar_is_own(hit)
   list(
     ok = TRUE,
     id = pluck_at(hit, "_id", default = term),
     rsid = myvariant_rsid(hit),
-    gene = mygene_first(pluck_at(hit, "dbnsfp", "genename")),
+    gene = myvariant_gene(hit),
     hgvsp = myvariant_hgvsp(hit),
     hgvsp_all = myvariant_hgvsp_all(hit),
     hgvsc_all = myvariant_hgvsc_all(hit),
     cadd_phred = .mv_cadd(hit),
-    clinvar_significance = myvariant_clinvar_sig(hit),
-    clinvar_id = mygene_first(pluck_at(hit, "clinvar", "variant_id")),
+    clinvar_significance = if (clinvar_ok) {
+      myvariant_clinvar_sig(hit)
+    } else {
+      NA_character_
+    },
+    clinvar_id = if (clinvar_ok) {
+      mygene_first(pluck_at(hit, "clinvar", "variant_id"))
+    } else {
+      NA_character_
+    },
     vcf_id = myvariant_vcf_id(hit)
   )
+}
+
+# FALSE when the hit's ClinVar block names a different rsID from its dbSNP
+# block, which means it describes another allele. MyVariant files BRCA1
+# 5382insC (rs80357906) under chr17:g.43057062_43057063dup, a TG duplication
+# with rsID rs2051500205.
+.mv_clinvar_is_own <- function(hit) {
+  dbsnp <- mygene_first(pluck_at(hit, "dbsnp", "rsid"))
+  clinvar <- mygene_first(pluck_at(hit, "clinvar", "rsid"))
+  is_blank(dbsnp) ||
+    is_blank(clinvar) ||
+    identical(tolower(dbsnp), tolower(clinvar))
 }
 
 # The hit's dbSNP rsID. Some records carry it only in their ClinVar block (the
@@ -299,6 +386,19 @@ myvariant_rsid <- function(hit) {
     rsid <- mygene_first(pluck_at(hit, "clinvar", "rsid"))
   }
   rsid
+}
+
+# The hit's gene. dbNSFP covers only single-base substitutions, so an indel or
+# a non-coding change takes snpEff's gene, then ClinVar's.
+myvariant_gene <- function(hit) {
+  gene <- mygene_first(pluck_at(hit, "dbnsfp", "genename"))
+  if (is_blank(gene)) {
+    gene <- mygene_first(.mv_snpeff_field(hit, "genename"))
+  }
+  if (is_blank(gene) && .mv_clinvar_is_own(hit)) {
+    gene <- mygene_first(pluck_at(hit, "clinvar", "gene", "symbol"))
+  }
+  gene
 }
 
 # One snpEff field (e.g. "hgvs_p") across a hit's annotations. `snpeff.ann` is
@@ -333,16 +433,71 @@ myvariant_hgvsc_all <- function(hit) {
   unique(changes[grepl("^c\\.", changes)])
 }
 
-# The protein change to show for a hit (e.g. p.Val600Glu). snpEff's comes
-# first: it is on the RefSeq transcript. dbNSFP lists one per Ensembl
-# transcript in no set order, so its first entry can be a minor isoform
-# (p.Val640Glu for BRAF V600E).
+# The protein change to show for a hit (e.g. p.Val600Glu), numbered on the
+# reviewed UniProt protein, which is what the protein and structure cards use.
+# Neither snpEff nor dbNSFP lists that one first: snpEff lists APOE's long
+# isoform (p.Arg202Cys) first, and dbNSFP's first TP53 entry is p.Arg136His,
+# not p.Arg175His. A transcript vote does not work either, since TP53 has
+# more transcripts for its short isoforms than for the usual one. Without a
+# reviewed position, the change most snpEff transcripts give is used, then
+# dbNSFP's first.
 myvariant_hgvsp <- function(hit) {
   snpeff <- .mv_snpeff_hgvsp(hit)
-  if (length(snpeff) > 0) {
-    return(snpeff[[1]])
+  dbnsfp <- unlist(pluck_at(hit, "dbnsfp", "hgvsp"), use.names = FALSE)
+  pos <- .mv_swissprot_pos(hit)
+  if (!is.na(pos)) {
+    named <- c(snpeff, dbnsfp)
+    named <- named[
+      grepl("^p\\.[A-Z][a-z]{2}", named) & .mv_protein_pos(named) %in% pos
+    ]
+    if (length(named) > 0) {
+      return(named[[1]])
+    }
   }
-  mygene_first(pluck_at(hit, "dbnsfp", "hgvsp"))
+  if (length(snpeff) > 0) {
+    counts <- table(factor(snpeff, levels = unique(snpeff)))
+    return(names(counts)[which.max(counts)])
+  }
+  mygene_first(dbnsfp)
+}
+
+# The residue number in a protein change ("p.Arg175His", "p.R175H" -> 175), or
+# NA.
+.mv_protein_pos <- function(x) {
+  suppressWarnings(as.integer(sub("^p\\.[A-Za-z]+?([0-9]+).*$", "\\1", x)))
+}
+
+# The residue number on the reviewed UniProt (Swiss-Prot) canonical protein,
+# from dbNSFP's per-transcript lists, or NA. dbNSFP pairs each transcript's
+# position with a UniProt entry. The canonical one has a plain accession
+# (P04637, not the isoform P04637-4) and a mnemonic entry name (P53_HUMAN);
+# unreviewed TrEMBL entries repeat their accession (A0A2R8Y8E0_HUMAN).
+.mv_swissprot_pos <- function(hit) {
+  pos <- suppressWarnings(as.integer(unlist(
+    pluck_at(hit, "dbnsfp", "aa", "pos"),
+    use.names = FALSE
+  )))
+  uniprot <- pluck_at(hit, "dbnsfp", "uniprot")
+  if (!is.null(names(uniprot))) {
+    uniprot <- list(uniprot)
+  }
+  if (length(uniprot) == 0 || length(uniprot) != length(pos)) {
+    return(NA_integer_)
+  }
+  canonical <- vapply(
+    uniprot,
+    function(u) {
+      acc <- as.character(pluck_at(u, "acc", default = ""))
+      entry <- as.character(pluck_at(u, "entry", default = ""))
+      nzchar(acc) &&
+        !grepl("-", acc) &&
+        nzchar(entry) &&
+        !startsWith(entry, acc)
+    },
+    logical(1)
+  )
+  found <- unique(pos[canonical & !is.na(pos)])
+  if (length(found) == 1) found else NA_integer_
 }
 
 # Every three-letter protein change for a hit, across transcripts. ClinVar
@@ -651,6 +806,7 @@ myvariant_gene_variants <- function(symbol, size = 200) {
         "clinvar.rcv.clinical_significance",
         "cadd.phred",
         "dbnsfp.cadd.phred",
+        "dbnsfp.uniprot",
         sep = ","
       )
     ),
@@ -663,15 +819,17 @@ myvariant_gene_variants <- function(symbol, size = 200) {
 }
 
 # One-letter amino-acid change (e.g. "V600E") from a dbnsfp.aa block, or NA.
-# `pos` arrives as a per-transcript array; the first position is representative.
-.mv_aa_label <- function(aa) {
+# `pos` arrives as a per-transcript array. `canonical` is the position on the
+# reviewed UniProt protein (see .mv_swissprot_pos()); without one, the first
+# position is used.
+.mv_aa_label <- function(aa, canonical = NA_integer_) {
   ref <- mygene_first(pluck_at(aa, "ref"))
   alt <- mygene_first(pluck_at(aa, "alt"))
   pos <- suppressWarnings(as.integer(unlist(
     pluck_at(aa, "pos"),
     use.names = FALSE
   )))
-  pos <- pos[!is.na(pos)]
+  pos <- if (is.na(canonical)) pos[!is.na(pos)] else canonical
   if (is_blank(ref) || is_blank(alt) || length(pos) == 0) {
     return(NA_character_)
   }
@@ -716,7 +874,7 @@ myvariant_parse_gene_variants <- function(hits) {
     data.frame(
       id = as.character(id),
       rsid = tolower(rsid),
-      label = .mv_aa_label(pluck_at(h, "dbnsfp", "aa")),
+      label = .mv_aa_label(pluck_at(h, "dbnsfp", "aa"), .mv_swissprot_pos(h)),
       significance = prim$label,
       rank = prim$rank,
       cadd = .mv_cadd(h),

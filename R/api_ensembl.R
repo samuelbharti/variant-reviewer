@@ -78,6 +78,82 @@ ensembl_vep_region <- function(vcf_id) {
   )
 }
 
+# Bases of the GRCh38 reference from `start` to `end` (1-based, inclusive), or
+# NULL when Ensembl cannot be reached.
+ensembl_sequence <- function(chrom, start, end) {
+  res <- vr_api_get(
+    ENSEMBL_BASE,
+    path = paste0("sequence/region/human/", chrom, ":", start, "..", end, ":1"),
+    query = list(`content-type` = "application/json"),
+    source = "Ensembl"
+  )
+  seq <- if (isTRUE(res$ok)) pluck_at(res$data, "seq") else NULL
+  if (is_blank(seq)) NULL else toupper(as.character(seq))
+}
+
+# An indel's chrom-pos-ref-alt id moved to its leftmost position in a repeat,
+# the form gnomAD stores: 13-32339427-AA-A (BRCA2 c.5073del) becomes
+# 13-32339421-CA-C. Substitutions are returned unchanged. NULL when the
+# reference cannot be fetched, or when the repeat runs past the `window`
+# bases fetched to the left.
+ensembl_left_align <- function(vcf_id, window = 200L) {
+  v <- .mv_parse_vcf_id(vcf_id)
+  if (is.null(v)) {
+    return(NULL)
+  }
+  if (nchar(v$ref) == nchar(v$alt)) {
+    return(vcf_id)
+  }
+  left <- if (v$pos > 1) {
+    ensembl_sequence(v$chrom, max(1L, v$pos - window), v$pos - 1L)
+  } else {
+    ""
+  }
+  if (is.null(left)) {
+    return(NULL)
+  }
+  moved <- vr_left_align(v$pos, v$ref, v$alt, left)
+  if (is.null(moved)) {
+    return(NULL)
+  }
+  paste(v$chrom, moved$pos, moved$ref, moved$alt, sep = "-")
+}
+
+# Pure helper for ensembl_left_align(), the usual normalization: drop a last
+# base ref and alt share; when either runs out, take the next reference base
+# from the left; repeat; then drop shared first bases down to one. `left` is
+# the reference just before `pos`. NULL when the shift runs past it.
+vr_left_align <- function(pos, ref, alt, left) {
+  repeat {
+    nr <- nchar(ref)
+    na <- nchar(alt)
+    if (nr > 0 && na > 0 && substr(ref, nr, nr) == substr(alt, na, na)) {
+      ref <- substr(ref, 1, nr - 1)
+      alt <- substr(alt, 1, na - 1)
+    } else if (nr == 0 || na == 0) {
+      nl <- nchar(left)
+      if (nl == 0) {
+        return(NULL)
+      }
+      base <- substr(left, nl, nl)
+      left <- substr(left, 1, nl - 1)
+      ref <- paste0(base, ref)
+      alt <- paste0(base, alt)
+      pos <- pos - 1L
+    } else {
+      break
+    }
+  }
+  while (
+    nchar(ref) > 1 && nchar(alt) > 1 && substr(ref, 1, 1) == substr(alt, 1, 1)
+  ) {
+    ref <- substring(ref, 2)
+    alt <- substring(alt, 2)
+    pos <- pos + 1L
+  }
+  list(pos = pos, ref = ref, alt = alt)
+}
+
 # Pure parser: a VEP record -> normalized result.
 ensembl_parse_vep <- function(record) {
   list(
