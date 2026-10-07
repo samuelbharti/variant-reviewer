@@ -41,15 +41,143 @@ test_that("myvariant_is_queryable() accepts rsIDs/HGVS, rejects bare changes", {
   expect_false(myvariant_is_queryable(""))
 })
 
-test_that("myvariant_parse_hit() extracts key annotations", {
-  hits <- read_fixture("myvariant_braf.json")$hits
-  res <- myvariant_parse_hit(hits[[1]], term = "rs113488022")
+test_that("myvariant_parse_hit() describes the one allele it was given", {
+  hits <- read_fixture("myvariant_braf_v600e_hg38.json")$hits
+  res <- myvariant_parse_hit(hits[[1]], term = "chr7:g.140753336A>T")
 
   expect_true(res$ok)
+  expect_equal(res$id, "chr7:g.140753336A>T")
   expect_equal(res$rsid, "rs113488022")
   expect_equal(res$gene, "BRAF")
-  expect_match(res$hgvsp, "^p\\.")
-  expect_true(is.numeric(res$cadd_phred) || is.na(res$cadd_phred))
+  # snpEff's RefSeq protein change, not dbNSFP's first isoform (p.Val640Glu).
+  expect_equal(res$hgvsp, "p.Val600Glu")
+  expect_true("p.Val600Glu" %in% res$hgvsp_all)
+  # hg38 records have no CADD block of their own; dbNSFP's score is used.
+  expect_true(is.numeric(res$cadd_phred) && !is.na(res$cadd_phred))
+  expect_equal(res$clinvar_id, "13961")
+  expect_equal(res$vcf_id, "7-140753336-A-T")
+})
+
+test_that("myvariant_query_term() quotes HGVS so MyVariant matches it", {
+  expect_equal(myvariant_query_term("rs113488022"), "rs113488022")
+  expect_equal(
+    myvariant_query_term(" chr7:g.140753336A>T "),
+    "\"chr7:g.140753336A>T\""
+  )
+})
+
+test_that("myvariant_pick_allele() lists the alleles of a multi-allele rsID", {
+  hits <- read_fixture("myvariant_rs113488022_hg38.json")$hits
+  res <- myvariant_pick_allele(hits, "rs113488022", "No annotation found for")
+
+  expect_false(res$ok)
+  expect_true(res$ambiguous)
+  expect_equal(res$gene, "BRAF")
+  expect_equal(nrow(res$alleles), 3L)
+  expect_setequal(
+    res$alleles$hgvsp,
+    c("p.Val600Ala", "p.Val600Glu", "p.Val600Gly")
+  )
+  expect_match(res$error, "p.Val600Glu (chr7:g.140753336A>T)", fixed = TRUE)
+})
+
+test_that("myvariant_pick_allele() takes a single hit and reports none", {
+  one <- myvariant_pick_allele(
+    list(list(`_id` = "chr7:g.140753336A>T")),
+    "rs1",
+    "No annotation found for"
+  )
+  expect_true(one$ok)
+  expect_equal(one$hit$`_id`, "chr7:g.140753336A>T")
+
+  none <- myvariant_pick_allele(list(), "rs1", "No annotation found for")
+  expect_false(none$ok)
+  expect_equal(none$error, "No annotation found for 'rs1'.")
+  expect_null(none$ambiguous)
+})
+
+test_that("myvariant_hgvsp() prefers snpEff over dbNSFP's isoform order", {
+  dbnsfp <- list(hgvsp = list("p.Val640Glu", "p.Val600Glu"))
+  # snpEff's annotation as one object, and as a list of them.
+  expect_equal(
+    myvariant_hgvsp(list(
+      dbnsfp = dbnsfp,
+      snpeff = list(ann = list(hgvs_p = "p.Val600Glu"))
+    )),
+    "p.Val600Glu"
+  )
+  expect_equal(
+    myvariant_hgvsp(list(
+      snpeff = list(
+        ann = list(list(hgvs_p = "p.Gly12Asp"), list(hgvs_p = "p.Gly12Asp"))
+      )
+    )),
+    "p.Gly12Asp"
+  )
+  # No snpEff protein change: the first dbNSFP one.
+  expect_equal(
+    myvariant_hgvsp(list(
+      dbnsfp = dbnsfp,
+      snpeff = list(ann = list(effect = "intron_variant"))
+    )),
+    "p.Val640Glu"
+  )
+  expect_true(is.na(myvariant_hgvsp(list())))
+})
+
+test_that("myvariant_vcf_id() needs every VCF field", {
+  hit <- list(
+    chrom = "7",
+    vcf = list(position = "140753336", ref = "A", alt = "T")
+  )
+  expect_equal(myvariant_vcf_id(hit), "7-140753336-A-T")
+  hit$vcf$alt <- NULL
+  expect_true(is.na(myvariant_vcf_id(hit)))
+})
+
+test_that("myvariant_distinct_alleles() merges one indel written two ways", {
+  hit <- function(id, pos, ref, alt, clinvar = NULL) {
+    list(
+      `_id` = id,
+      chrom = "7",
+      vcf = list(position = pos, ref = ref, alt = alt),
+      clinvar = if (!is.null(clinvar)) list(variant_id = clinvar)
+    )
+  }
+  # CFTR F508del, shifted right and left inside its repeat, plus the CTT
+  # duplication at the same rsID, which MyVariant has without VCF fields.
+  right <- hit("chr7:g.117559592_117559594del", "117559591", "TCTT", "T")
+  left <- hit(
+    "chr7:g.117559591_117559593del",
+    "117559590",
+    "ATCT",
+    "A",
+    clinvar = 7105
+  )
+  dup <- list(`_id` = "chr7:g.117559592_117559594dup")
+
+  kept <- myvariant_distinct_alleles(list(right, left, dup))
+  ids <- vapply(kept, function(h) h$`_id`, character(1))
+  # The two deletions are one allele, and the one ClinVar knows is kept. The
+  # record without VCF fields cannot be compared, so it stays.
+  expect_equal(
+    ids,
+    c("chr7:g.117559591_117559593del", "chr7:g.117559592_117559594dup")
+  )
+
+  # Different bases at one position are different alleles.
+  snv <- function(alt) list(chrom = "7", pos = 140753336L, ref = "A", alt = alt)
+  expect_false(.mv_same_change(snv("T"), snv("C")))
+  expect_true(.mv_same_change(snv("T"), snv("T")))
+})
+
+test_that("vr_variant_allele() passes one allele and flags an unpicked rsID", {
+  expect_equal(vr_variant_allele(list(ok = TRUE, id = "x"))$id, "x")
+  expect_true(
+    vr_variant_allele(list(ok = FALSE, ambiguous = TRUE, error = "e"))$ambiguous
+  )
+  expect_null(vr_variant_allele(list(ok = FALSE, error = "down")))
+  expect_null(vr_variant_allele(NULL))
 })
 
 test_that("gtex_parse_rows() builds a tissue/median data.frame", {
@@ -345,10 +473,12 @@ test_that("myvariant_parse_gene_variants() builds a ranked variant table", {
   res <- myvariant_parse_gene_variants(hits)
   expect_true(res$ok)
   v <- res$variants
-  expect_true(all(c("rsid", "label", "significance", "cadd") %in% names(v)))
-  # rsIDs are lower-cased and unique.
+  expect_true(all(
+    c("id", "rsid", "label", "significance", "cadd") %in% names(v)
+  ))
+  # One row per allele; rsIDs are lower-cased.
+  expect_equal(anyDuplicated(v$id), 0L)
   expect_true(all(grepl("^rs[0-9]+$", v$rsid)))
-  expect_equal(anyDuplicated(v$rsid), 0L)
   # Amino-acid labels take the one-letter ref+pos+alt form (e.g. L485S).
   expect_true(any(grepl("^[A-Z][0-9]+[A-Z*]$", v$label)))
   # Every suggestion is pathogenic/likely-pathogenic, most severe ranked first.
@@ -359,44 +489,44 @@ test_that("myvariant_parse_gene_variants() builds a ranked variant table", {
   )))
 })
 
-test_that("myvariant_parse_gene_variants() drops rsID-less hits and de-dupes", {
+test_that("myvariant_parse_gene_variants() keeps each allele of an rsID", {
+  allele <- function(id, alt, sig, rsid = "rs1") {
+    list(
+      `_id` = id,
+      dbsnp = list(rsid = rsid),
+      dbnsfp = list(aa = list(ref = "V", alt = alt, pos = list(600))),
+      clinvar = list(rcv = list(clinical_significance = sig))
+    )
+  }
   hits <- list(
+    allele("chr7:g.140753336A>T", "E", "Pathogenic"),
+    # Same rsID, another allele: its own row.
+    allele("chr7:g.140753336A>C", "G", "Likely pathogenic", rsid = "RS1"),
+    # The same allele twice (kept once), and a hit with no rsID (dropped).
+    allele("chr7:g.140753336A>T", "E", "Pathogenic"),
     list(
-      dbsnp = list(rsid = "rs1"),
-      dbnsfp = list(
-        aa = list(
-          ref = "V",
-          alt = "E",
-          pos = list(600)
-        )
-      ),
-      clinvar = list(rcv = list(clinical_significance = "Pathogenic"))
-    ),
-    # duplicate rsID (kept once), and a hit with no rsID (dropped).
-    list(
-      dbsnp = list(rsid = "RS1"),
-      clinvar = list(
-        rcv = list(
-          clinical_significance = "Likely pathogenic"
-        )
-      )
-    ),
-    list(dbnsfp = list(aa = list(ref = "A", alt = "T", pos = list(1))))
+      `_id` = "chr1:g.1A>T",
+      dbnsfp = list(aa = list(ref = "A", alt = "T", pos = list(1)))
+    )
   )
   res <- myvariant_parse_gene_variants(hits)
   expect_true(res$ok)
-  expect_equal(nrow(res$variants), 1L)
-  expect_equal(res$variants$rsid, "rs1")
-  expect_equal(res$variants$label, "V600E")
+  expect_equal(nrow(res$variants), 2L)
+  expect_equal(
+    res$variants$id,
+    c("chr7:g.140753336A>T", "chr7:g.140753336A>C")
+  )
+  expect_equal(res$variants$rsid, c("rs1", "rs1"))
+  expect_equal(res$variants$label, c("V600E", "V600G"))
 })
 
-test_that("myvariant_variant_choices() maps display labels to rsIDs", {
+test_that("myvariant_variant_choices() maps display labels to allele ids", {
   parsed <- myvariant_parse_gene_variants(
     read_fixture("myvariant_gene_variants_braf.json")$hits
   )
   choices <- myvariant_variant_choices(parsed, max_n = 3)
   expect_length(choices, 3)
-  expect_true(all(grepl("^rs[0-9]+$", unname(choices))))
+  expect_true(all(grepl("^chr[0-9XY]+:g\\.", unname(choices))))
   expect_match(names(choices)[1], "\\(")
   # No suggestions for a failed parse.
   expect_length(myvariant_variant_choices(list(ok = FALSE)), 0)

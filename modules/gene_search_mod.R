@@ -1,13 +1,16 @@
 # Gene-first search box. Returns a reactive carrying the submitted query so the
 # parent can fan it out to the result modules.
 
-# A coherent, well-supported example (BRAF V600E) that populates every card:
-# the gene resolves, and the rsID drives the variant, ClinVar, gnomAD, and VEP
-# lookups. Shared by the UI label and the server handler.
+# A coherent, well-supported example (BRAF V600E) that populates every card.
+# The variant is the allele's HGVS id, not its rsID: rs113488022 also covers
+# V600A and V600G, and the rsID alone does not say which one is meant.
+# `variant_label` is what the Variant box shows for it, in the same form as the
+# gene's suggestions. Shared by the UI label and the server handlers.
 .gene_search_example <- list(
   label = "BRAF V600E",
   gene = "BRAF",
-  variant = "rs113488022"
+  variant = "chr7:g.140753336A>T",
+  variant_label = "V600E, rs113488022"
 )
 
 gene_search_ui <- function(id) {
@@ -217,7 +220,7 @@ gene_search_server <- function(id, requested = reactiveVal(NULL)) {
         "variant",
         choices = stats::setNames(
           .gene_search_example$variant,
-          .gene_search_example$variant
+          .gene_search_example$variant_label
         ),
         selected = .gene_search_example$variant,
         server = FALSE

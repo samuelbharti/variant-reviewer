@@ -45,7 +45,11 @@ function(input, output, session) {
     has_gene <- !is_blank(query$gene)
     has_variant <- !is_blank(query$variant)
     ann <- if (has_variant) annotation_raw() else NULL
-    variant_gene <- if (isTRUE(ann$ok)) ann$gene else NULL
+    # An rsID that covers several alleles is not annotated until one is
+    # picked, but MyVariant still names its gene.
+    variant_gene <- if (isTRUE(ann$ok) || isTRUE(ann$ambiguous)) {
+      ann$gene
+    }
     mismatch <- has_gene &&
       has_variant &&
       !is_blank(variant_gene) &&
@@ -532,7 +536,7 @@ function(input, output, session) {
     updateSelectizeInput(
       session,
       "search-variant",
-      choices = stats::setNames(ex$variant, ex$variant),
+      choices = stats::setNames(ex$variant, ex$variant_label),
       selected = ex$variant,
       server = FALSE
     )
@@ -597,7 +601,12 @@ function(input, output, session) {
             required = FALSE
           ),
           variant = ellmer::type_string(
-            "An rsID (rs...) or HGVS string. Omit for a gene-only search.",
+            paste(
+              "An rsID (rs...) or HGVS string. Omit for a gene-only search.",
+              "One rsID can cover several alleles; the variant card then lists",
+              "them with their HGVS, and you search again with the HGVS of the",
+              "one you mean."
+            ),
             required = FALSE
           )
         ),

@@ -36,6 +36,7 @@ test_that("gene_search_server prefetches variant suggestions for the gene", {
     list(
       ok = TRUE,
       variants = data.frame(
+        id = "chr7:g.140753336A>T",
         rsid = "rs1",
         label = "V600E",
         significance = "Pathogenic",
