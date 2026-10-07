@@ -4,6 +4,26 @@ All notable changes to this project should be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- The BRAF V600E example showed V600A on the Variant card and V600G's ClinVar
+  record (#27). rs113488022 covers three alleles, and the MyVariant and ClinVar
+  lookups took the first match. Every variant card now describes the one allele
+  you picked. Suggestions and the example carry the allele's GRCh38 HGVS id,
+  ClinVar uses that allele's own record, and gnomAD and VEP look it up by
+  position and base change. An rsID that covers more than one allele now asks
+  you to pick one, instead of showing whichever came first. TP53 R175H and
+  KRAS G12D had the same problem.
+- MyVariant lookups used GRCh37, while the page says GRCh38. They now use
+  GRCh38. MyVariant has CADD scores of its own only for GRCh37, so the CADD
+  score now comes from dbNSFP (29.8 for BRAF V600E, was 32).
+- An HGVS string typed into the Variant box never found anything, because
+  MyVariant needs it in quotes.
+- The protein change could name a minor isoform (p.Val640Glu for BRAF V600E).
+  It now comes from snpEff, on the RefSeq transcript.
+- MyVariant can hold one indel twice, written at both ends of a repeat. Those
+  now count as one allele (CFTR F508del).
+
 ## [2.3.3] - 2026-09-10
 
 ### Added

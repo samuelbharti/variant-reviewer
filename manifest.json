@@ -3124,7 +3124,7 @@
       "checksum": "fa5f3a63306060721eb9335aeb817d06"
     },
     "app_server.R": {
-      "checksum": "917f7a913246fc0d3803ffba73152b34"
+      "checksum": "0e2552460ea44f38807b51ba5b708525"
     },
     "app_ui.R": {
       "checksum": "cca2a0f20d027a9f6233abd8adc37a8b"
@@ -3154,7 +3154,7 @@
       "checksum": "3fc9908df58e0a2f5ba7602da0302399"
     },
     "modules/clinvar_mod.R": {
-      "checksum": "b8ce3768b68fcd0148d1c2ebacaa6e23"
+      "checksum": "c10b03d0888cd222ae0e4b0ab41ff8aa"
     },
     "modules/conservation_mod.R": {
       "checksum": "0bae762c241af98826a1ea03aa891b6c"
@@ -3163,7 +3163,7 @@
       "checksum": "465abdefd666e3558e2b8566082362de"
     },
     "modules/ensembl_mod.R": {
-      "checksum": "36e8675a87310719a68bb919b8a78672"
+      "checksum": "ca2a43b0d35b51b6efb493dc30f5ac2e"
     },
     "modules/external_links_mod.R": {
       "checksum": "efd22d57d02ac6006c314135cc80a892"
@@ -3175,7 +3175,7 @@
       "checksum": "9da94f4b1df5e79c9e416cdb70194d99"
     },
     "modules/gene_search_mod.R": {
-      "checksum": "ee9a272191ced55104cc4f54d82fa2d1"
+      "checksum": "9284e6720cbe99f7825b9be8a0fa218b"
     },
     "modules/gene_summary_mod.R": {
       "checksum": "2377be55c029d91a481ab5f26d9eb5a2"
@@ -3184,7 +3184,7 @@
       "checksum": "4c9fa65b401cab23169617383cabd782"
     },
     "modules/gnomad_mod.R": {
-      "checksum": "cd81c2a100fc59889d7f553e43b77c25"
+      "checksum": "8cae135fe92972884f6e7d98ffb2b223"
     },
     "modules/gtex_expression_mod.R": {
       "checksum": "eb9e1530ed5b0fc4340c069efc8c0a47"
@@ -3217,7 +3217,7 @@
       "checksum": "ffa672061ed0acf437cdabad5c2956de"
     },
     "modules/variant_landscape_mod.R": {
-      "checksum": "133704cc98c1ad5ad337ff8336293a45"
+      "checksum": "1d073aac03ef59b50e1636456bfa276b"
     },
     "modules/variant_summary_mod.R": {
       "checksum": "b891dd1d5aa7344ce05745bec9b8344c"
@@ -3229,16 +3229,16 @@
       "checksum": "f829a3c697dcc28cbc4c1bbe0c8df5ba"
     },
     "R/api_clinvar.R": {
-      "checksum": "bc47448c1ed5764cc66d9297d9524f5e"
+      "checksum": "56643a60123b32019d1b5ab517919e84"
     },
     "R/api_ensembl.R": {
-      "checksum": "18943f91f965f74764eeb743d945f8ef"
+      "checksum": "281421778fee37549c3abe413e26aec4"
     },
     "R/api_europepmc.R": {
       "checksum": "9e8e094c40839c41da89e1eb250588b5"
     },
     "R/api_gnomad.R": {
-      "checksum": "7563f0980db36cf2c90c011b8afec3e4"
+      "checksum": "7a921942c45cfafa594642dcd49b7b93"
     },
     "R/api_gtex.R": {
       "checksum": "628e02fd3485bb36428e2afa3f4e5d51"
@@ -3253,7 +3253,7 @@
       "checksum": "5f7319a7f745e72d119979e2b23186d7"
     },
     "R/api_myvariant.R": {
-      "checksum": "37ca36259f2b5caf9356a0642385ec9b"
+      "checksum": "e8f3261fe06bac531f34f117b2791f75"
     },
     "R/api_opentargets.R": {
       "checksum": "9cb02ff7792befc2f465c972f58337db"
@@ -3292,7 +3292,7 @@
       "checksum": "944732407c61e0b62a40704efe7ed783"
     },
     "README.md": {
-      "checksum": "4ce843cc6ffd908e320d1eb7ce1ca1a6"
+      "checksum": "72d19e85af2df503f754c38840f659e8"
     },
     "renv.lock": {
       "checksum": "84f9c11f21882700e10d27df4837dda9"
@@ -3301,7 +3301,7 @@
       "checksum": "10e74014b0deb38d6b28558b567c6574"
     },
     "userInterface/dashboard_ui.R": {
-      "checksum": "a446a00ad5f55df9f3e0f182519bb3a9"
+      "checksum": "dc81fb0975b1ab5920b083543d3ab02d"
     },
     "www/css/.gitkeep": {
       "checksum": "d41d8cd98f00b204e9800998ecf8427e"
