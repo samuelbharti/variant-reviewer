@@ -126,3 +126,49 @@ test_that("allele-level cards ask for an allele when an rsID has several", {
     expect_match(session$returned()$error, "Pick one")
   })
 })
+
+test_that("a picked allele without a position is never looked up by rsID", {
+  # By rsID, gnomAD and VEP can answer for another allele of the rsID (the CTT
+  # duplication at rs113993960 got F508del's frequency), so they refuse.
+  rsid <- reactive("rs113993960")
+  allele <- reactive(list(
+    ok = TRUE,
+    id = "chr7:g.117559592_117559594dup",
+    vcf_id = NA_character_
+  ))
+  testServer(gnomad_server, args = list(rsid = rsid, allele = allele), {
+    expect_match(session$returned$data()$error, "no genomic position")
+  })
+  testServer(ensembl_server, args = list(rsid = rsid, allele = allele), {
+    expect_match(session$returned()$error, "no genomic position")
+  })
+})
+
+test_that("gnomad_allele_frequency() keeps an rsID answer only for the same change", {
+  # Stub the network lookup: the right-shifted id is unknown to gnomAD, and
+  # the rsID answers with a variant id of its own choosing.
+  orig <- gnomad_frequency
+  answer <- "7-117559590-ATCT-A"
+  gnomad_frequency <<- function(
+    rsid,
+    dataset = GNOMAD_DATASET,
+    variant_id = NULL
+  ) {
+    if (!is.null(variant_id)) {
+      return(list(ok = FALSE, missing = TRUE, error = "gnomAD has no record."))
+    }
+    list(ok = TRUE, variant_id = answer)
+  }
+  on.exit(gnomad_frequency <<- orig, add = TRUE)
+
+  # F508del written at the right end of its repeat: same change, kept.
+  res <- gnomad_allele_frequency("rs113993960", "7-117559591-TCTT-T")
+  expect_true(res$ok)
+  expect_equal(res$variant_id, "7-117559590-ATCT-A")
+
+  # Another allele of the rsID: not kept, the "no record" stands.
+  answer <- "7-117559594-T-TCTT"
+  res <- gnomad_allele_frequency("rs113993960", "7-117559591-TCTT-T")
+  expect_false(res$ok)
+  expect_true(res$missing)
+})

@@ -46,16 +46,33 @@ gnomad_frequency <- function(
   if (!res$ok) {
     return(list(ok = FALSE, error = res$error))
   }
+  no_record <- list(
+    ok = FALSE,
+    missing = TRUE,
+    error = paste0("gnomAD has no record for ", label, ".")
+  )
   if (!is.null(res$data$errors)) {
-    return(list(ok = FALSE, error = gnomad_query_error(res$data$errors, label)))
+    kind <- gnomad_error_kind(res$data$errors)
+    if (identical(kind, "missing")) {
+      return(no_record)
+    }
+    return(list(
+      ok = FALSE,
+      error = if (identical(kind, "multiple")) {
+        paste0(
+          "gnomAD has more than one variant for ",
+          label,
+          ". Pick one allele in the Variant box to see its frequency."
+        )
+      } else {
+        "gnomAD returned a query error."
+      }
+    ))
   }
 
   variant <- pluck_at(res$data, "data", "variant")
   if (is.null(variant)) {
-    return(list(
-      ok = FALSE,
-      error = paste0("gnomAD has no record for ", label, ".")
-    ))
+    return(no_record)
   }
 
   list(
@@ -71,25 +88,45 @@ gnomad_frequency <- function(
   )
 }
 
-# Plain message for a gnomAD GraphQL error. gnomAD reports a missing variant,
-# and an rsID it cannot resolve to one allele, as errors, not as empty data.
-gnomad_query_error <- function(errors, label) {
+# What a gnomAD GraphQL error means: "missing" (no such variant), "multiple"
+# (an rsID that covers more than one variant) or "other". gnomAD reports the
+# first two as errors, not as empty data.
+gnomad_error_kind <- function(errors) {
   messages <- unlist(
     lapply(errors, function(e) pluck_at(e, "message")),
     use.names = FALSE
   )
   text <- tolower(paste(messages, collapse = " "))
   if (grepl("not found", text, fixed = TRUE)) {
-    return(paste0("gnomAD has no record for ", label, "."))
+    return("missing")
   }
   if (grepl("multiple variants", text, fixed = TRUE)) {
-    return(paste0(
-      "gnomAD has more than one variant for ",
-      label,
-      ". Pick one allele in the Variant box to see its frequency."
-    ))
+    return("multiple")
   }
-  "gnomAD returned a query error."
+  "other"
+}
+
+# Allele frequencies for one picked allele, by its chrom-pos-ref-alt id.
+#
+# gnomAD keys an indel by its left-aligned form, and MyVariant can hold the
+# same indel shifted right (CFTR F508del is 7-117559590-ATCT-A in gnomAD and
+# also 7-117559591-TCTT-T in MyVariant). So when gnomAD has no record for the
+# id, the rsID is tried, and its answer is kept only when it is the same
+# change. Without an id there is no safe lookup: the rsID alone can return
+# another allele.
+gnomad_allele_frequency <- function(rsid, vcf_id, dataset = GNOMAD_DATASET) {
+  if (is_blank(vcf_id)) {
+    return(vr_allele_unplaced("gnomAD"))
+  }
+  res <- gnomad_frequency(rsid, dataset, variant_id = vcf_id)
+  if (isTRUE(res$ok) || !isTRUE(res$missing) || is_blank(rsid)) {
+    return(res)
+  }
+  by_rsid <- gnomad_frequency(rsid, dataset)
+  if (isTRUE(by_rsid$ok) && myvariant_same_vcf_id(by_rsid$variant_id, vcf_id)) {
+    return(by_rsid)
+  }
+  res
 }
 
 # Display labels for gnomAD's genetic-ancestry group codes.

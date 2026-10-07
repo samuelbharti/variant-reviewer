@@ -25,10 +25,13 @@ myvariant_is_queryable <- function(variant) {
 
 # The `q` value for a variant. MyVariant reads an unquoted HGVS string such as
 # chr7:g.140753336A>T as a field:value query and finds nothing, so HGVS is
-# quoted.
+# quoted, with any quote or backslash typed inside it escaped.
 myvariant_query_term <- function(variant) {
   term <- trimws(as.character(variant))
-  if (grepl(":", term, fixed = TRUE)) paste0("\"", term, "\"") else term
+  if (!grepl(":", term, fixed = TRUE)) {
+    return(term)
+  }
+  paste0("\"", gsub("([\"\\\\])", "\\\\\\1", term), "\"")
 }
 
 # Fetch the hit for the one allele `variant` names. An HGVS string names one
@@ -47,9 +50,12 @@ myvariant_fetch_allele <- function(variant, fields, not_found) {
     "chrom",
     "vcf",
     "clinvar.variant_id",
+    "clinvar.rsid",
     "dbnsfp.genename",
     "dbnsfp.hgvsp",
-    "snpeff.ann.hgvs_p"
+    "dbnsfp.hgvsc",
+    "snpeff.ann.hgvs_p",
+    "snpeff.ann.hgvs_c"
   )
   res <- vr_api_get(
     MYVARIANT_BASE,
@@ -174,6 +180,26 @@ myvariant_distinct_alleles <- function(hits) {
   identical(edit(a), edit(b))
 }
 
+# A chrom-pos-ref-alt id ("7-117559590-ATCT-A") as a VCF record (see
+# myvariant_vcf()), or NULL when it is not one.
+.mv_parse_vcf_id <- function(id) {
+  if (is_blank(id)) {
+    return(NULL)
+  }
+  parts <- strsplit(as.character(id), "-", fixed = TRUE)[[1]]
+  pos <- suppressWarnings(as.integer(parts[2]))
+  if (length(parts) != 4 || is.na(pos) || !all(nzchar(parts))) {
+    return(NULL)
+  }
+  list(chrom = parts[[1]], pos = pos, ref = parts[[3]], alt = parts[[4]])
+}
+
+# TRUE when two chrom-pos-ref-alt ids name the same change, written either way
+# round inside a repeat (see .mv_same_change()).
+myvariant_same_vcf_id <- function(a, b) {
+  .mv_same_change(.mv_parse_vcf_id(a), .mv_parse_vcf_id(b))
+}
+
 # Returns:
 #   list(ok = TRUE, id, rsid, gene, hgvsp, hgvsp_all, cadd_phred,
 #        clinvar_significance, clinvar_id, vcf_id)
@@ -232,18 +258,32 @@ vr_allele_needed <- function(what) {
   )
 }
 
+# What a card shows when the picked allele has no genomic position in
+# MyVariant. Looking it up by rsID instead could return another allele.
+vr_allele_unplaced <- function(source) {
+  list(
+    ok = FALSE,
+    error = paste0(
+      "MyVariant has no genomic position for this allele, so ",
+      source,
+      " cannot look it up."
+    )
+  )
+}
+
 # Pure parser: turn a single MyVariant hit into the normalized result. Besides
 # what the Variant card shows, it carries what the other variant cards need to
 # find this same allele: its ClinVar variation id, its VCF id (for gnomAD and
-# VEP), and every spelling of its protein change.
+# VEP), and every spelling of its cDNA and protein change.
 myvariant_parse_hit <- function(hit, term = NA_character_) {
   list(
     ok = TRUE,
     id = pluck_at(hit, "_id", default = term),
-    rsid = mygene_first(pluck_at(hit, "dbsnp", "rsid")),
+    rsid = myvariant_rsid(hit),
     gene = mygene_first(pluck_at(hit, "dbnsfp", "genename")),
     hgvsp = myvariant_hgvsp(hit),
     hgvsp_all = myvariant_hgvsp_all(hit),
+    hgvsc_all = myvariant_hgvsc_all(hit),
     cadd_phred = .mv_cadd(hit),
     clinvar_significance = myvariant_clinvar_sig(hit),
     clinvar_id = mygene_first(pluck_at(hit, "clinvar", "variant_id")),
@@ -251,9 +291,19 @@ myvariant_parse_hit <- function(hit, term = NA_character_) {
   )
 }
 
-# snpEff's protein changes for a hit. `snpeff.ann` is one object, or a list of
-# them when the variant hits several transcripts.
-.mv_snpeff_hgvsp <- function(hit) {
+# The hit's dbSNP rsID. Some records carry it only in their ClinVar block (the
+# ClinVar record for CFTR F508del has no dbsnp block).
+myvariant_rsid <- function(hit) {
+  rsid <- mygene_first(pluck_at(hit, "dbsnp", "rsid"))
+  if (is_blank(rsid)) {
+    rsid <- mygene_first(pluck_at(hit, "clinvar", "rsid"))
+  }
+  rsid
+}
+
+# One snpEff field (e.g. "hgvs_p") across a hit's annotations. `snpeff.ann` is
+# one object, or a list of them when the variant hits several transcripts.
+.mv_snpeff_field <- function(hit, field) {
   ann <- pluck_at(hit, "snpeff", "ann")
   if (is.null(ann)) {
     return(character())
@@ -261,11 +311,26 @@ myvariant_parse_hit <- function(hit, term = NA_character_) {
   if (!is.null(names(ann))) {
     ann <- list(ann)
   }
-  changes <- unlist(
-    lapply(ann, function(a) pluck_at(a, "hgvs_p")),
+  values <- unlist(
+    lapply(ann, function(a) pluck_at(a, field)),
     use.names = FALSE
   )
-  changes[!is.na(changes) & nzchar(changes)]
+  values[!is.na(values) & nzchar(values)]
+}
+
+.mv_snpeff_hgvsp <- function(hit) .mv_snpeff_field(hit, "hgvs_p")
+
+# Every cDNA change for a hit, across transcripts (e.g. "c.1799T>A"). The bases
+# some tools write after del/dup ("c.1521_1523delCTT") are dropped, as in
+# ClinVar's titles. ClinVar records are matched on this, since two alleles at
+# one position can share a protein change but never a cDNA change.
+myvariant_hgvsc_all <- function(hit) {
+  changes <- c(
+    .mv_snpeff_field(hit, "hgvs_c"),
+    unlist(pluck_at(hit, "dbnsfp", "hgvsc"), use.names = FALSE)
+  )
+  changes <- sub("(del|dup)[ACGTN]+$", "\\1", changes)
+  unique(changes[grepl("^c\\.", changes)])
 }
 
 # The protein change to show for a hit (e.g. p.Val600Glu). snpEff's comes
