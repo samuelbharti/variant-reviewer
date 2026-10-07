@@ -3,6 +3,14 @@
 
 MYVARIANT_BASE <- "https://myvariant.info/v1"
 
+# The dashboard annotates GRCh38, so variant lookups ask MyVariant for hg38
+# records. Left out, MyVariant answers in hg19.
+MYVARIANT_ASSEMBLY <- "hg38"
+
+# One rsID can cover several alleles (rs113488022 is V600A, V600E and V600G),
+# so a variant lookup asks for up to this many hits and then picks one.
+MYVARIANT_MAX_ALLELES <- 10
+
 # MyVariant resolves rsIDs and HGVS strings, but free-text matches a bare
 # protein change (e.g. "R175H") to an arbitrary variant. Only query for inputs
 # that look like an rsID or an HGVS string (which contains a ":").
@@ -15,9 +23,162 @@ myvariant_is_queryable <- function(variant) {
     grepl(":", term, fixed = TRUE)
 }
 
+# The `q` value for a variant. MyVariant reads an unquoted HGVS string such as
+# chr7:g.140753336A>T as a field:value query and finds nothing, so HGVS is
+# quoted.
+myvariant_query_term <- function(variant) {
+  term <- trimws(as.character(variant))
+  if (grepl(":", term, fixed = TRUE)) paste0("\"", term, "\"") else term
+}
+
+# Fetch the hit for the one allele `variant` names. An HGVS string names one
+# allele. An rsID can name several, and then no hit is picked: the error lists
+# the alleles so the user can choose, since any choice made here would be a
+# guess (taking the first hit is what showed V600A for BRAF V600E).
+# `fields` are the fields the caller needs; the ones used to label alleles are
+# added here.
 # Returns:
-#   list(ok = TRUE, id, rsid, gene, hgvsp, cadd_phred, clinvar_significance)
-#   list(ok = FALSE, error = "...")
+#   list(ok = TRUE, hit)
+#   list(ok = FALSE, error, ambiguous = TRUE, gene, alleles) for several alleles
+#   list(ok = FALSE, error = "...") otherwise
+myvariant_fetch_allele <- function(variant, fields, not_found) {
+  term <- trimws(as.character(variant))
+  allele_fields <- c(
+    "chrom",
+    "vcf",
+    "clinvar.variant_id",
+    "dbnsfp.genename",
+    "dbnsfp.hgvsp",
+    "snpeff.ann.hgvs_p"
+  )
+  res <- vr_api_get(
+    MYVARIANT_BASE,
+    path = "query",
+    query = list(
+      q = myvariant_query_term(term),
+      size = MYVARIANT_MAX_ALLELES,
+      assembly = MYVARIANT_ASSEMBLY,
+      fields = paste(unique(c(fields, allele_fields)), collapse = ",")
+    ),
+    source = "MyVariant"
+  )
+  if (!res$ok) {
+    return(list(ok = FALSE, error = res$error))
+  }
+  myvariant_pick_allele(res$data$hits, term, not_found)
+}
+
+# Pure helper for myvariant_fetch_allele(): the one hit, or an error naming
+# every allele when there are several.
+myvariant_pick_allele <- function(hits, term, not_found) {
+  if (is.null(hits) || length(hits) == 0) {
+    return(list(ok = FALSE, error = paste0(not_found, " '", term, "'.")))
+  }
+  hits <- myvariant_distinct_alleles(hits)
+  if (length(hits) == 1) {
+    return(list(ok = TRUE, hit = hits[[1]]))
+  }
+  ids <- vapply(
+    hits,
+    function(h) as.character(pluck_at(h, "_id", default = NA_character_)),
+    character(1)
+  )
+  changes <- vapply(hits, myvariant_hgvsp, character(1))
+  alleles <- data.frame(id = ids, hgvsp = changes, stringsAsFactors = FALSE)
+  alleles <- alleles[order(alleles$id), , drop = FALSE]
+  rownames(alleles) <- NULL
+  listed <- ifelse(
+    is.na(alleles$hgvsp),
+    alleles$id,
+    paste0(alleles$hgvsp, " (", alleles$id, ")")
+  )
+  genes <- unique(stats::na.omit(vapply(
+    hits,
+    function(h) mygene_first(pluck_at(h, "dbnsfp", "genename")),
+    character(1)
+  )))
+  list(
+    ok = FALSE,
+    ambiguous = TRUE,
+    # Every allele of an rsID sits in the same gene, so the gene-level cards
+    # can still load while the user picks one.
+    gene = if (length(genes) == 1) genes[[1]] else NULL,
+    alleles = alleles,
+    error = paste0(
+      term,
+      " covers ",
+      nrow(alleles),
+      " alleles: ",
+      paste(listed, collapse = ", "),
+      ". Pick one from the Variant list, or enter its HGVS."
+    )
+  )
+}
+
+# MyVariant can hold one indel twice, shifted left and right inside a repeat:
+# CFTR F508del is both 7-117559590-ATCT-A and 7-117559591-TCTT-T. Those are one
+# allele, so they are merged, keeping the hit with a ClinVar record (the one
+# ClinVar and gnomAD also use). Hits without VCF fields are kept as they are.
+myvariant_distinct_alleles <- function(hits) {
+  kept <- list()
+  for (hit in hits) {
+    vcf <- myvariant_vcf(hit)
+    same <- which(vapply(
+      kept,
+      function(k) .mv_same_change(myvariant_vcf(k), vcf),
+      logical(1)
+    ))
+    if (length(same) == 0) {
+      kept[[length(kept) + 1]] <- hit
+    } else if (
+      is_blank(pluck_at(kept[[same[[1]]]], "clinvar", "variant_id")) &&
+        !is_blank(pluck_at(hit, "clinvar", "variant_id"))
+    ) {
+      kept[[same[[1]]]] <- hit
+    }
+  }
+  kept
+}
+
+# TRUE when two VCF records (see myvariant_vcf()) make the same edit to the
+# reference. Their ref bases are laid over one stretch of the reference (they
+# must agree where they overlap and leave no gap), each edit is applied, and
+# the two results are compared.
+.mv_same_change <- function(a, b) {
+  if (is.null(a) || is.null(b) || !identical(a$chrom, b$chrom)) {
+    return(FALSE)
+  }
+  start <- min(a$pos, b$pos)
+  end <- max(a$pos + nchar(a$ref), b$pos + nchar(b$ref)) - 1
+  ref <- rep(NA_character_, end - start + 1)
+  for (r in list(a, b)) {
+    at <- r$pos - start + seq_len(nchar(r$ref))
+    bases <- strsplit(r$ref, "", fixed = TRUE)[[1]]
+    if (any(!is.na(ref[at]) & ref[at] != bases)) {
+      return(FALSE)
+    }
+    ref[at] <- bases
+  }
+  if (anyNA(ref)) {
+    return(FALSE)
+  }
+  edit <- function(r) {
+    before <- seq_len(r$pos - start)
+    after <- seq_along(ref) > r$pos - start + nchar(r$ref)
+    paste0(
+      paste(ref[before], collapse = ""),
+      r$alt,
+      paste(ref[after], collapse = "")
+    )
+  }
+  identical(edit(a), edit(b))
+}
+
+# Returns:
+#   list(ok = TRUE, id, rsid, gene, hgvsp, hgvsp_all, cadd_phred,
+#        clinvar_significance, clinvar_id, vcf_id)
+#   list(ok = FALSE, error = "...") (plus ambiguous, gene and alleles when an
+#   rsID covers several alleles; see myvariant_fetch_allele())
 myvariant_annotate <- function(variant) {
   if (is_blank(variant)) {
     return(list(ok = FALSE, error = "No variant supplied."))
@@ -25,58 +186,148 @@ myvariant_annotate <- function(variant) {
   if (!myvariant_is_queryable(variant)) {
     return(list(
       ok = FALSE,
-      error = "Enter an rsID (rs...) or HGVS (e.g. chr7:g.140453136A>G) for variant-level annotation."
+      error = "Enter an rsID (rs...) or HGVS (e.g. chr7:g.140753336A>T) for variant-level annotation."
     ))
   }
   term <- trimws(as.character(variant))
 
-  res <- vr_api_get(
-    MYVARIANT_BASE,
-    path = "query",
-    query = list(
-      q = term,
-      size = 1,
-      fields = paste(
-        "dbsnp.rsid",
-        "dbnsfp.genename",
-        "dbnsfp.hgvsp",
-        "cadd.phred",
-        "clinvar.rcv.clinical_significance",
-        sep = ","
-      )
+  found <- myvariant_fetch_allele(
+    term,
+    fields = c(
+      "dbsnp.rsid",
+      "cadd.phred",
+      "dbnsfp.cadd.phred",
+      "clinvar.rcv.clinical_significance"
     ),
-    source = "MyVariant"
+    not_found = "No annotation found for"
   )
-  if (!res$ok) {
-    return(list(ok = FALSE, error = res$error))
+  if (!found$ok) {
+    return(found)
   }
-
-  hits <- res$data$hits
-  if (is.null(hits) || length(hits) == 0) {
-    return(list(
-      ok = FALSE,
-      error = paste0("No annotation found for '", term, "'.")
-    ))
-  }
-  myvariant_parse_hit(hits[[1]], term)
+  myvariant_parse_hit(found$hit, term)
 }
 
-# Pure parser: turn a single MyVariant hit into the normalized result.
+# The allele the variant cards describe, from a myvariant_annotate() result: the
+# result itself when it names one allele, list(ambiguous = TRUE) when the input
+# is an rsID covering several, and NULL when there is nothing to go on.
+vr_variant_allele <- function(annotation) {
+  if (isTRUE(annotation$ok)) {
+    return(annotation)
+  }
+  if (isTRUE(annotation$ambiguous)) {
+    return(list(ambiguous = TRUE))
+  }
+  NULL
+}
+
+# What an allele-level card shows while an rsID's allele is not picked yet.
+vr_allele_needed <- function(what) {
+  list(
+    ok = FALSE,
+    error = paste0(
+      "This rsID covers more than one allele. Pick one in the Variant box to see its ",
+      what,
+      "."
+    )
+  )
+}
+
+# Pure parser: turn a single MyVariant hit into the normalized result. Besides
+# what the Variant card shows, it carries what the other variant cards need to
+# find this same allele: its ClinVar variation id, its VCF id (for gnomAD and
+# VEP), and every spelling of its protein change.
 myvariant_parse_hit <- function(hit, term = NA_character_) {
   list(
     ok = TRUE,
     id = pluck_at(hit, "_id", default = term),
     rsid = mygene_first(pluck_at(hit, "dbsnp", "rsid")),
     gene = mygene_first(pluck_at(hit, "dbnsfp", "genename")),
-    hgvsp = mygene_first(pluck_at(hit, "dbnsfp", "hgvsp")),
-    cadd_phred = pluck_at(hit, "cadd", "phred", default = NA),
-    clinvar_significance = myvariant_clinvar_sig(hit)
+    hgvsp = myvariant_hgvsp(hit),
+    hgvsp_all = myvariant_hgvsp_all(hit),
+    cadd_phred = .mv_cadd(hit),
+    clinvar_significance = myvariant_clinvar_sig(hit),
+    clinvar_id = mygene_first(pluck_at(hit, "clinvar", "variant_id")),
+    vcf_id = myvariant_vcf_id(hit)
   )
 }
 
+# snpEff's protein changes for a hit. `snpeff.ann` is one object, or a list of
+# them when the variant hits several transcripts.
+.mv_snpeff_hgvsp <- function(hit) {
+  ann <- pluck_at(hit, "snpeff", "ann")
+  if (is.null(ann)) {
+    return(character())
+  }
+  if (!is.null(names(ann))) {
+    ann <- list(ann)
+  }
+  changes <- unlist(
+    lapply(ann, function(a) pluck_at(a, "hgvs_p")),
+    use.names = FALSE
+  )
+  changes[!is.na(changes) & nzchar(changes)]
+}
+
+# The protein change to show for a hit (e.g. p.Val600Glu). snpEff's comes
+# first: it is on the RefSeq transcript. dbNSFP lists one per Ensembl
+# transcript in no set order, so its first entry can be a minor isoform
+# (p.Val640Glu for BRAF V600E).
+myvariant_hgvsp <- function(hit) {
+  snpeff <- .mv_snpeff_hgvsp(hit)
+  if (length(snpeff) > 0) {
+    return(snpeff[[1]])
+  }
+  mygene_first(pluck_at(hit, "dbnsfp", "hgvsp"))
+}
+
+# Every three-letter protein change for a hit, across transcripts. ClinVar
+# names a record by one of them, e.g. "NM_004333.6(BRAF):c.1799T>A
+# (p.Val600Glu)", so this is what a ClinVar title is matched against.
+myvariant_hgvsp_all <- function(hit) {
+  changes <- c(
+    .mv_snpeff_hgvsp(hit),
+    unlist(pluck_at(hit, "dbnsfp", "hgvsp"), use.names = FALSE)
+  )
+  unique(changes[grepl("^p\\.[A-Z][a-z]{2}[0-9]", changes)])
+}
+
+# The hit's GRCh38 VCF record as list(chrom, pos, ref, alt), or NULL when a
+# field is missing.
+myvariant_vcf <- function(hit) {
+  chrom <- as.character(pluck_at(hit, "chrom", default = NA))
+  pos <- suppressWarnings(as.integer(pluck_at(hit, "vcf", "position")))
+  ref <- as.character(pluck_at(hit, "vcf", "ref", default = NA))
+  alt <- as.character(pluck_at(hit, "vcf", "alt", default = NA))
+  parts <- c(chrom, ref, alt)
+  if (length(pos) != 1 || is.na(pos) || anyNA(parts) || !all(nzchar(parts))) {
+    return(NULL)
+  }
+  list(chrom = chrom, pos = pos, ref = ref, alt = alt)
+}
+
+# The allele as chrom-pos-ref-alt ("7-140753336-A-T"), the form gnomAD uses for
+# its variant ids, or NA when the VCF fields are missing.
+myvariant_vcf_id <- function(hit) {
+  vcf <- myvariant_vcf(hit)
+  if (is.null(vcf)) {
+    return(NA_character_)
+  }
+  paste(vcf$chrom, vcf$pos, vcf$ref, vcf$alt, sep = "-")
+}
+
+# CADD phred for a hit. MyVariant's own CADD block exists only for hg19
+# records, so hg38 records fall back to the CADD score dbNSFP carries.
+.mv_cadd <- function(hit) {
+  cadd <- .mv_max_num(pluck_at(hit, "cadd", "phred"))
+  if (is.na(cadd)) {
+    cadd <- .mv_max_num(pluck_at(hit, "dbnsfp", "cadd", "phred"))
+  }
+  cadd
+}
+
 # In-silico pathogenicity predictions for a variant, from dbNSFP (+ CADD) via
-# MyVariant. Same query style as myvariant_annotate(), so it resolves the same
-# hit. Returns:
+# MyVariant. Fetched through myvariant_fetch_allele() like
+# myvariant_annotate(), so it resolves the same allele. Returns:
 #   list(ok = TRUE, predictions = list(list(name, score, call), ...))
 #   list(ok = FALSE, error = "...")
 myvariant_predictions <- function(variant) {
@@ -89,37 +340,24 @@ myvariant_predictions <- function(variant) {
       error = "Enter an rsID (rs...) or HGVS for in-silico predictions."
     ))
   }
-  term <- trimws(as.character(variant))
-  res <- vr_api_get(
-    MYVARIANT_BASE,
-    path = "query",
-    query = list(
-      q = term,
-      size = 1,
-      fields = paste(
-        "cadd.phred",
-        "dbnsfp.revel",
-        "dbnsfp.alphamissense",
-        "dbnsfp.sift",
-        "dbnsfp.polyphen2",
-        "dbnsfp.metalr",
-        "dbnsfp.metasvm",
-        sep = ","
-      )
+  found <- myvariant_fetch_allele(
+    variant,
+    fields = c(
+      "cadd.phred",
+      "dbnsfp.cadd.phred",
+      "dbnsfp.revel",
+      "dbnsfp.alphamissense",
+      "dbnsfp.sift",
+      "dbnsfp.polyphen2",
+      "dbnsfp.metalr",
+      "dbnsfp.metasvm"
     ),
-    source = "MyVariant"
+    not_found = "No predictions found for"
   )
-  if (!res$ok) {
-    return(list(ok = FALSE, error = res$error))
+  if (!found$ok) {
+    return(list(ok = FALSE, error = found$error))
   }
-  hits <- res$data$hits
-  if (is.null(hits) || length(hits) == 0) {
-    return(list(
-      ok = FALSE,
-      error = paste0("No predictions found for '", term, "'.")
-    ))
-  }
-  myvariant_parse_predictions(hits[[1]])
+  myvariant_parse_predictions(found$hit)
 }
 
 # dbNSFP prediction-code dictionaries (per predictor). Codes come as a scalar or
@@ -160,7 +398,7 @@ myvariant_predictions <- function(variant) {
 myvariant_parse_predictions <- function(hit) {
   d <- pluck_at(hit, "dbnsfp")
   revel <- .mv_max_num(pluck_at(d, "revel", "score"))
-  cadd <- .mv_max_num(pluck_at(hit, "cadd", "phred"))
+  cadd <- .mv_cadd(hit)
   entries <- list(
     list(
       name = "REVEL",
@@ -245,7 +483,14 @@ myvariant_conservation <- function(variant) {
   res <- vr_api_get(
     MYVARIANT_BASE,
     path = "query",
-    query = list(q = term, size = 1, fields = "dbnsfp"),
+    # Conservation is a property of the position, so whichever allele of an
+    # rsID comes first gives the same scores.
+    query = list(
+      q = term,
+      size = 1,
+      assembly = MYVARIANT_ASSEMBLY,
+      fields = "dbnsfp"
+    ),
     source = "MyVariant"
   )
   if (!res$ok) {
@@ -310,8 +555,10 @@ myvariant_parse_conservation <- function(hit) {
 
 # Notable variants for a gene: ClinVar pathogenic / likely-pathogenic variants
 # that carry an rsID, used to populate the search box's variant suggestions.
+# One row per allele, keyed by its hg38 HGVS id, so the two pathogenic alleles
+# of rs113488022 (V600E and V600G) are two separate choices.
 # Returns:
-#   list(ok = TRUE, variants = data.frame(rsid, label, significance, cadd))
+#   list(ok = TRUE, variants = data.frame(id, rsid, label, significance, cadd))
 #   list(ok = FALSE, error = "...")
 myvariant_gene_variants <- function(symbol, size = 200) {
   if (is_blank(symbol)) {
@@ -330,6 +577,7 @@ myvariant_gene_variants <- function(symbol, size = 200) {
         " AND _exists_:dbsnp.rsid"
       ),
       size = size,
+      assembly = MYVARIANT_ASSEMBLY,
       fields = paste(
         "dbsnp.rsid",
         "dbnsfp.aa.ref",
@@ -337,6 +585,7 @@ myvariant_gene_variants <- function(symbol, size = 200) {
         "dbnsfp.aa.pos",
         "clinvar.rcv.clinical_significance",
         "cadd.phred",
+        "dbnsfp.cadd.phred",
         sep = ","
       )
     ),
@@ -386,24 +635,26 @@ myvariant_gene_variants <- function(symbol, size = 200) {
 }
 
 # Pure parser: turn gene-scoped hits into a ranked, de-duplicated variant table
-# (most severe first, then highest CADD). One row per rsID.
+# (most severe first, then highest CADD). One row per allele.
 myvariant_parse_gene_variants <- function(hits) {
   empty <- list(ok = FALSE, error = "No notable variants found for this gene.")
   if (is.null(hits) || length(hits) == 0) {
     return(empty)
   }
   rows <- lapply(hits, function(h) {
+    id <- pluck_at(h, "_id")
     rsid <- mygene_first(pluck_at(h, "dbsnp", "rsid"))
-    if (is_blank(rsid)) {
+    if (is_blank(id) || is_blank(rsid)) {
       return(NULL)
     }
     prim <- .mv_sig_primary(myvariant_clinvar_sig(h))
     data.frame(
+      id = as.character(id),
       rsid = tolower(rsid),
       label = .mv_aa_label(pluck_at(h, "dbnsfp", "aa")),
       significance = prim$label,
       rank = prim$rank,
-      cadd = .mv_max_num(pluck_at(h, "cadd", "phred")),
+      cadd = .mv_cadd(h),
       stringsAsFactors = FALSE
     )
   })
@@ -412,15 +663,17 @@ myvariant_parse_gene_variants <- function(hits) {
     return(empty)
   }
   rows <- rows[order(rows$rank, -ifelse(is.na(rows$cadd), -Inf, rows$cadd)), ]
-  rows <- rows[!duplicated(rows$rsid), ]
+  rows <- rows[!duplicated(rows$id), ]
   rows$rank <- NULL
   rownames(rows) <- NULL
   list(ok = TRUE, variants = rows)
 }
 
-# Named character vector for a selectizeInput: value = rsID, name = display label
-# like "V600E, rs113488022 (Pathogenic)". Falls back to the rsID when there is
-# no amino-acid change (e.g. splice/frameshift variants).
+# Named character vector for a selectizeInput: value = the allele's hg38 HGVS
+# id, name = display label like "V600E, rs113488022 (Pathogenic)". The value is
+# the HGVS id, not the rsID, because one rsID can be several alleles and the
+# choice has to say which one. Falls back to the rsID in the label when there
+# is no amino-acid change (e.g. splice/frameshift variants).
 myvariant_variant_choices <- function(parsed, max_n = 100) {
   if (is.null(parsed) || !isTRUE(parsed$ok)) {
     return(character())
@@ -434,7 +687,7 @@ myvariant_variant_choices <- function(parsed, max_n = 100) {
     sprintf("%s (%s)", v$rsid, v$significance),
     sprintf("%s, %s (%s)", v$label, v$rsid, v$significance)
   )
-  stats::setNames(v$rsid, disp)
+  stats::setNames(v$id, disp)
 }
 
 # clinvar.rcv may be a single object or a list of RCV records; collapse the

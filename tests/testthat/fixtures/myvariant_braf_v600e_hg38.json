@@ -1,0 +1,102 @@
+{
+  "took": 53,
+  "total": 1,
+  "max_score": 1.0,
+  "hits": [
+    {
+      "_id": "chr7:g.140753336A>T",
+      "_score": 1.0,
+      "chrom": "7",
+      "clinvar": {
+        "_license": "http://bit.ly/2SQdcI0",
+        "rcv": [
+          {
+            "clinical_significance": "Pathogenic"
+          },
+          {
+            "clinical_significance": "Pathogenic"
+          },
+          {
+            "clinical_significance": "Pathogenic"
+          },
+          {
+            "clinical_significance": "Pathogenic"
+          },
+          {
+            "clinical_significance": "Pathogenic"
+          },
+          {
+            "clinical_significance": "Pathogenic"
+          },
+          {
+            "clinical_significance": "Pathogenic"
+          },
+          {
+            "clinical_significance": "not provided"
+          },
+          {
+            "clinical_significance": "Likely pathogenic"
+          },
+          {
+            "clinical_significance": "Pathogenic"
+          },
+          {
+            "clinical_significance": "Pathogenic"
+          },
+          {
+            "clinical_significance": "Pathogenic"
+          },
+          {
+            "clinical_significance": "Likely pathogenic"
+          },
+          {
+            "clinical_significance": "Pathogenic"
+          },
+          {
+            "clinical_significance": "Pathogenic"
+          },
+          {
+            "clinical_significance": "Likely pathogenic"
+          },
+          {
+            "clinical_significance": "Uncertain significance"
+          }
+        ],
+        "variant_id": 13961
+      },
+      "dbnsfp": {
+        "_license": "http://bit.ly/2VLnQBz",
+        "cadd": {
+          "phred": 29.8
+        },
+        "genename": [
+          "BRAF",
+          "BRAF",
+          "BRAF",
+          "BRAF"
+        ],
+        "hgvsp": [
+          "p.Val640Glu",
+          "p.Val600Glu",
+          "p.Val207Glu",
+          "p.V600E"
+        ]
+      },
+      "dbsnp": {
+        "_license": "http://bit.ly/2AqoLOc",
+        "rsid": "rs113488022"
+      },
+      "snpeff": {
+        "_license": "http://bit.ly/2suyRKt",
+        "ann": {
+          "hgvs_p": "p.Val600Glu"
+        }
+      },
+      "vcf": {
+        "alt": "T",
+        "position": "140753336",
+        "ref": "A"
+      }
+    }
+  ]
+}
