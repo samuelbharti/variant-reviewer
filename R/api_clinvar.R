@@ -7,7 +7,8 @@ EUTILS_BASE <- "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 # Look up the ClinVar classification for a search term (an rsID works best).
 #
 # `allele` is the myvariant_annotate() result for the allele being reviewed, or
-# NULL. ClinVar keeps one record per allele, so an rsID can return several
+# NULL. ClinVar keeps a record per allele, and also records for haplotypes
+# and compound changes that contain it, so an rsID can return several
 # (rs113488022 returns V600G's and V600E's). With an allele, the record is its
 # own: the ClinVar variation id MyVariant has for it, else the record whose
 # title names its cDNA change (see clinvar_pick_uid()). Without one, a single
@@ -17,8 +18,28 @@ EUTILS_BASE <- "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 #        last_evaluated, conditions)
 #   list(ok = FALSE, error = "...")
 clinvar_classification <- function(term, allele = NULL) {
+  cdna <- allele$hgvsc_all
+  protein <- allele$hgvsp_all
+  checkable <- length(cdna) > 0 || length(protein) > 0
+  # An indel in a repeat has more than one cDNA name (GJB2 35delG is c.30del
+  # to snpEff and c.35del to ClinVar), so its protein change can stand in.
+  indel <- any(grepl("del|dup|ins", cdna)) ||
+    .clinvar_vcf_is_indel(allele$vcf_id)
+
+  # MyVariant's id can name a haplotype that contains the allele: for rs7412
+  # it is APOE's c.[526C>T;725G>A]. So the record is used only when its title
+  # names the allele, or when there is nothing to check it against.
   if (!is_blank(allele$clinvar_id)) {
-    return(clinvar_fetch_record(as.character(allele$clinvar_id)))
+    uid <- as.character(allele$clinvar_id)
+    own <- clinvar_fetch_record(uid)
+    if (
+      !isTRUE(own$ok) ||
+        !checkable ||
+        is_blank(term) ||
+        !is.null(clinvar_pick_uid(uid, list(own), cdna, protein, indel))
+    ) {
+      return(own)
+    }
   }
   if (is_blank(term)) {
     return(list(
@@ -71,19 +92,34 @@ clinvar_classification <- function(term, allele = NULL) {
   uid <- clinvar_pick_uid(
     ids,
     records,
-    cdna = allele$hgvsc_all,
-    protein = allele$hgvsp_all
+    cdna = cdna,
+    protein = protein,
+    protein_too = indel
   )
   if (is.null(uid)) {
+    # Say what was checked. Without a cDNA or protein change there is nothing
+    # to match on, which is not the same as ClinVar having no record.
     return(list(
       ok = FALSE,
-      error = paste0(
-        "No ClinVar record for ",
-        if (is_blank(allele$hgvsp)) allele$id else allele$hgvsp,
-        " (",
-        term,
-        ")."
-      )
+      error = if (checkable) {
+        paste0(
+          "None of the ClinVar records for ",
+          term,
+          " is for ",
+          if (is_blank(allele$hgvsp)) allele$id else allele$hgvsp,
+          "."
+        )
+      } else {
+        paste0(
+          "ClinVar has ",
+          length(ids),
+          " record(s) for ",
+          term,
+          ", but ",
+          allele$id,
+          " has no cDNA or protein change to match them on. Check them on ClinVar."
+        )
+      }
     ))
   }
   clinvar_parse_record(records[[match(uid, ids)]], uid)
@@ -118,38 +154,51 @@ clinvar_fetch_record <- function(uid) {
 
 # Pure helper: the uid of the record whose title names the allele, or NULL. A
 # title reads like "NM_004333.6(BRAF):c.1799T>A (p.Val600Glu)". When the allele
-# has cDNA changes, only those count: two alleles at one position can share a
-# protein change (both TTA>TTT and TTA>TTC are Leu>Phe) but never a cDNA
-# change. The protein change is used only when no cDNA change is known.
+# has cDNA changes, those are matched first: two alleles at one position can
+# share a protein change (both TTA>TTT and TTA>TTC are Leu>Phe) but never a
+# cDNA change. The protein change is used when no cDNA change is known, or,
+# with `protein_too`, when none matched (for an indel, whose cDNA name depends
+# on where in a repeat it is written).
 clinvar_pick_uid <- function(
   ids,
   records,
   cdna = character(),
-  protein = character()
+  protein = character(),
+  protein_too = FALSE
 ) {
   titles <- vapply(
     records,
     function(r) as.character(pluck_at(r, "title", default = "")),
     character(1)
   )
-  named <- if (length(cdna) > 0) {
+  by_cdna <- if (length(cdna) > 0) {
     title_cdna <- ifelse(
       grepl(":c\\.[^ ]+", titles),
       sub("^.*?:(c\\.[^ ]+).*$", "\\1", titles, perl = TRUE),
       ""
     )
     sub("(del|dup)[ACGTN]+$", "\\1", title_cdna) %in% cdna
-  } else if (length(protein) > 0) {
+  } else {
+    logical(length(ids))
+  }
+  named <- by_cdna
+  if (
+    !any(named) && length(protein) > 0 && (length(cdna) == 0 || protein_too)
+  ) {
     needles <- paste0("(", protein, ")")
-    vapply(
+    named <- vapply(
       titles,
       function(t) any(vapply(needles, grepl, logical(1), x = t, fixed = TRUE)),
       logical(1)
     )
-  } else {
-    logical(length(ids))
   }
   if (!any(named)) NULL else as.character(ids[[which(named)[[1]]]])
+}
+
+# TRUE when a chrom-pos-ref-alt id is an insertion or deletion.
+.clinvar_vcf_is_indel <- function(vcf_id) {
+  parts <- if (is_blank(vcf_id)) character() else strsplit(vcf_id, "-")[[1]]
+  length(parts) == 4 && nchar(parts[[3]]) != nchar(parts[[4]])
 }
 
 # Pure parser: an esummary ClinVar record -> normalized classification list.

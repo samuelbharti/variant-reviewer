@@ -144,31 +144,57 @@ test_that("a picked allele without a position is never looked up by rsID", {
   })
 })
 
-test_that("gnomad_allele_frequency() keeps an rsID answer only for the same change", {
-  # Stub the network lookup: the right-shifted id is unknown to gnomAD, and
-  # the rsID answers with a variant id of its own choosing.
-  orig <- gnomad_frequency
-  answer <- "7-117559590-ATCT-A"
+test_that("gnomad_allele_frequency() moves an unknown indel left before giving up", {
+  # Stub the network: gnomAD knows only the ids in `known`, an rsID lookup
+  # answers with `by_rsid`, and the reference is available or not.
+  orig_freq <- gnomad_frequency
+  orig_align <- ensembl_left_align
+  known <- "13-32339421-CA-C"
+  by_rsid <- NULL
+  aligned <- "13-32339421-CA-C"
   gnomad_frequency <<- function(
     rsid,
     dataset = GNOMAD_DATASET,
     variant_id = NULL
   ) {
-    if (!is.null(variant_id)) {
-      return(list(ok = FALSE, missing = TRUE, error = "gnomAD has no record."))
+    if (is.null(variant_id)) {
+      return(by_rsid)
     }
-    list(ok = TRUE, variant_id = answer)
+    if (variant_id %in% known) {
+      return(list(ok = TRUE, variant_id = variant_id))
+    }
+    list(ok = FALSE, missing = TRUE, error = "gnomAD has no record.")
   }
-  on.exit(gnomad_frequency <<- orig, add = TRUE)
+  ensembl_left_align <<- function(vcf_id, window = 200L) aligned
+  on.exit(
+    {
+      gnomad_frequency <<- orig_freq
+      ensembl_left_align <<- orig_align
+    },
+    add = TRUE
+  )
 
-  # F508del written at the right end of its repeat: same change, kept.
-  res <- gnomad_allele_frequency("rs113993960", "7-117559591-TCTT-T")
+  # BRCA2 c.5073del as MyVariant writes it: found at its leftmost position.
+  res <- gnomad_allele_frequency("rs80359479", "13-32339427-AA-A")
   expect_true(res$ok)
+  expect_equal(res$variant_id, "13-32339421-CA-C")
+
+  # A substitution is not moved: its "no record" stands.
+  res <- gnomad_allele_frequency("rs1", "7-140753336-A-G")
+  expect_true(res$missing)
+
+  # No reference: the rsID answer is kept only for the same change.
+  aligned <- NULL
+  known <- "7-117559590-ATCT-A"
+  by_rsid <- list(ok = TRUE, variant_id = "7-117559590-ATCT-A")
+  res <- gnomad_allele_frequency("rs113993960", "7-117559591-TCTT-T")
   expect_equal(res$variant_id, "7-117559590-ATCT-A")
 
-  # Another allele of the rsID: not kept, the "no record" stands.
-  answer <- "7-117559594-T-TCTT"
+  # No reference and another allele from the rsID: the card says the
+  # absence was not checked, not that gnomAD has no record.
+  by_rsid <- list(ok = TRUE, variant_id = "7-117559594-T-TCTT")
   res <- gnomad_allele_frequency("rs113993960", "7-117559591-TCTT-T")
   expect_false(res$ok)
-  expect_true(res$missing)
+  expect_null(res$missing)
+  expect_match(res$error, "does not show the variant is missing")
 })

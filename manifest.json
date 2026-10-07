@@ -3142,7 +3142,7 @@
       "checksum": "d41d8cd98f00b204e9800998ecf8427e"
     },
     "demo_cache.rds": {
-      "checksum": "a1897f10233de6aebdc8248906b790a2"
+      "checksum": "c83e691623aaecac2c9341f8dafaafb4"
     },
     "global.R": {
       "checksum": "a743e2569d4c310e7eb0228734e76e6f"
@@ -3229,16 +3229,16 @@
       "checksum": "f829a3c697dcc28cbc4c1bbe0c8df5ba"
     },
     "R/api_clinvar.R": {
-      "checksum": "c06cc569d9336320c33e70fd4ffdd55f"
+      "checksum": "d182644a0099717ef5928220d12b40b9"
     },
     "R/api_ensembl.R": {
-      "checksum": "281421778fee37549c3abe413e26aec4"
+      "checksum": "27a7d4038cf450873a8dd12c74d5b2a7"
     },
     "R/api_europepmc.R": {
       "checksum": "9e8e094c40839c41da89e1eb250588b5"
     },
     "R/api_gnomad.R": {
-      "checksum": "ca5f1a1648cb2234dc051dd41d23697c"
+      "checksum": "2b7137bc6e14f518bedbfc730c8b8e90"
     },
     "R/api_gtex.R": {
       "checksum": "628e02fd3485bb36428e2afa3f4e5d51"
@@ -3253,7 +3253,7 @@
       "checksum": "5f7319a7f745e72d119979e2b23186d7"
     },
     "R/api_myvariant.R": {
-      "checksum": "11decaffbd5559fdc8889c76ca7a52b1"
+      "checksum": "0961b70cdc748dd3c8b86f92da7bf354"
     },
     "R/api_opentargets.R": {
       "checksum": "9cb02ff7792befc2f465c972f58337db"

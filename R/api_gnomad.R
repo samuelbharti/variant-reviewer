@@ -108,25 +108,52 @@ gnomad_error_kind <- function(errors) {
 
 # Allele frequencies for one picked allele, by its chrom-pos-ref-alt id.
 #
-# gnomAD keys an indel by its left-aligned form, and MyVariant can hold the
-# same indel shifted right (CFTR F508del is 7-117559590-ATCT-A in gnomAD and
-# also 7-117559591-TCTT-T in MyVariant). So when gnomAD has no record for the
-# id, the rsID is tried, and its answer is kept only when it is the same
-# change. Without an id there is no safe lookup: the rsID alone can return
-# another allele.
+# gnomAD stores an indel at its leftmost position in a repeat, and MyVariant
+# can hold the same indel further right (BRCA2 c.5073del is 13-32339421-CA-C
+# in gnomAD and 13-32339427-AA-A in MyVariant). So an indel gnomAD does not
+# know is moved left against the reference and tried again. When the
+# reference cannot be fetched, the rsID is tried and its answer kept only
+# when it is the same change; failing that, the card says the absence was not
+# checked, since "no record" would read as evidence the variant is rare.
+# Without an id there is no safe lookup: the rsID alone can return another
+# allele.
 gnomad_allele_frequency <- function(rsid, vcf_id, dataset = GNOMAD_DATASET) {
   if (is_blank(vcf_id)) {
     return(vr_allele_unplaced("gnomAD"))
   }
   res <- gnomad_frequency(rsid, dataset, variant_id = vcf_id)
-  if (isTRUE(res$ok) || !isTRUE(res$missing) || is_blank(rsid)) {
+  v <- .mv_parse_vcf_id(vcf_id)
+  is_indel <- !is.null(v) && nchar(v$ref) != nchar(v$alt)
+  if (isTRUE(res$ok) || !isTRUE(res$missing) || !is_indel) {
     return(res)
   }
-  by_rsid <- gnomad_frequency(rsid, dataset)
-  if (isTRUE(by_rsid$ok) && myvariant_same_vcf_id(by_rsid$variant_id, vcf_id)) {
-    return(by_rsid)
+
+  aligned <- ensembl_left_align(vcf_id)
+  if (identical(aligned, vcf_id)) {
+    return(res)
   }
-  res
+  if (!is.null(aligned)) {
+    return(gnomad_frequency(rsid, dataset, variant_id = aligned))
+  }
+
+  if (!is_blank(rsid)) {
+    by_rsid <- gnomad_frequency(rsid, dataset)
+    if (
+      isTRUE(by_rsid$ok) && myvariant_same_vcf_id(by_rsid$variant_id, vcf_id)
+    ) {
+      return(by_rsid)
+    }
+  }
+  list(
+    ok = FALSE,
+    error = paste0(
+      "gnomAD has no record for ",
+      vcf_id,
+      " as written. gnomAD lists an insertion or deletion at its leftmost",
+      " position in a repeat, and that position could not be checked, so",
+      " this does not show the variant is missing from gnomAD."
+    )
+  )
 }
 
 # Display labels for gnomAD's genetic-ancestry group codes.
