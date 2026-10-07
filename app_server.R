@@ -98,8 +98,14 @@ function(input, output, session) {
     if (is.null(ok_context())) NULL else annotation_raw()
   })
 
-  # The dbSNP rsID drives the gnomAD and ClinVar lookups: use the input directly
-  # when it is an rsID, otherwise the one MyVariant resolved.
+  # The one allele the ClinVar, gnomAD and VEP cards describe. An rsID can
+  # cover several alleles, and those sources would otherwise each pick their
+  # own (see vr_variant_allele()).
+  variant_allele <- reactive(vr_variant_allele(variant_annotation()))
+
+  # The dbSNP rsID: the input itself when it is an rsID, otherwise the one
+  # MyVariant resolved. Cards that work per rsID or per position use it, and
+  # ClinVar, gnomAD and VEP fall back to it when no single allele is known.
   variant_rsid <- reactive({
     ctx <- ok_context()
     if (is.null(ctx) || !ctx$has_variant) {
@@ -166,14 +172,14 @@ function(input, output, session) {
     search_effective,
     variant_annotation
   )
-  clinvar_data <- clinvar_server("clinvar", variant_rsid)
+  clinvar_data <- clinvar_server("clinvar", variant_rsid, variant_allele)
   # gnomad_server() also returns its retry-bump function, so the ancestry card
-  # below -- which renders this same result rather than fetching its own --
+  # below -- which renders this same result instead of fetching its own --
   # can wire its own refresh button to retry it too.
-  gnomad_result <- gnomad_server("gnomad", variant_rsid)
+  gnomad_result <- gnomad_server("gnomad", variant_rsid, variant_allele)
   gnomad_data <- gnomad_result$data
   constraint_data <- gene_constraint_server("constraint", resolved)
-  ensembl_data <- ensembl_server("ensembl", variant_rsid)
+  ensembl_data <- ensembl_server("ensembl", variant_rsid, variant_allele)
   gtex_data <- gtex_expression_server("gtex", resolved)
   string_data <- string_ppi_server("string_ppi", resolved)
   opentargets_data <- opentargets_server("opentargets", resolved)

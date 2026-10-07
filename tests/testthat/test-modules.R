@@ -111,3 +111,18 @@ test_that("gene_summary_server renders an error state without crashing", {
     }
   )
 })
+
+test_that("allele-level cards ask for an allele when an rsID has several", {
+  # Nothing is fetched: each card answers from the unpicked allele alone.
+  rsid <- reactive("rs113488022")
+  allele <- reactive(list(ambiguous = TRUE))
+  testServer(clinvar_server, args = list(rsid = rsid, allele = allele), {
+    expect_match(session$returned()$error, "Pick one")
+  })
+  testServer(gnomad_server, args = list(rsid = rsid, allele = allele), {
+    expect_match(session$returned$data()$error, "Pick one")
+  })
+  testServer(ensembl_server, args = list(rsid = rsid, allele = allele), {
+    expect_match(session$returned()$error, "Pick one")
+  })
+})

@@ -1,24 +1,32 @@
-# gnomAD client: population allele frequencies for a variant, looked up by
-# rsID (avoids hg19/hg38 coordinate mismatches). GraphQL API:
+# gnomAD client: population allele frequencies for a variant, looked up by its
+# GRCh38 gnomAD variant id when the allele is known, else by rsID. GraphQL API:
 # https://gnomad.broadinstitute.org/api
 
 GNOMAD_URL <- "https://gnomad.broadinstitute.org/api"
 GNOMAD_DATASET <- "gnomad_r4"
 
-# Allele frequencies for an rsID.
+# Allele frequencies for a variant. `variant_id` is gnomAD's id for one allele
+# ("7-140753336-A-T"); when it is known it is used in place of the rsID, which
+# gnomAD refuses to resolve when it covers several alleles.
 # Returns:
 #   list(ok = TRUE, variant_id, dataset, exome = list(af, ac, an)|NULL,
 #        genome = list(af, ac, an)|NULL)
 #   list(ok = FALSE, error = "...")
-gnomad_frequency <- function(rsid, dataset = GNOMAD_DATASET) {
-  if (is_blank(rsid)) {
+gnomad_frequency <- function(
+  rsid,
+  dataset = GNOMAD_DATASET,
+  variant_id = NULL
+) {
+  by_id <- !is_blank(variant_id)
+  if (!by_id && is_blank(rsid)) {
     return(list(ok = FALSE, error = "No rsID available for gnomAD lookup."))
   }
+  label <- if (by_id) variant_id else rsid
 
   query <- sprintf(
     paste(
-      "query($rsid: String!) {",
-      "  variant(rsid: $rsid, dataset: %s) {",
+      "query($id: String!) {",
+      "  variant(%s: $id, dataset: %s) {",
       "    variant_id",
       "    exome { af ac an populations { id ac an } }",
       "    genome { af ac an populations { id ac an } }",
@@ -26,26 +34,27 @@ gnomad_frequency <- function(rsid, dataset = GNOMAD_DATASET) {
       "}",
       sep = "\n"
     ),
+    if (by_id) "variantId" else "rsid",
     dataset
   )
 
   res <- vr_api_post_json(
     GNOMAD_URL,
-    body = list(query = query, variables = list(rsid = rsid)),
+    body = list(query = query, variables = list(id = label)),
     source = "gnomAD"
   )
   if (!res$ok) {
     return(list(ok = FALSE, error = res$error))
   }
   if (!is.null(res$data$errors)) {
-    return(list(ok = FALSE, error = "gnomAD returned a query error."))
+    return(list(ok = FALSE, error = gnomad_query_error(res$data$errors, label)))
   }
 
   variant <- pluck_at(res$data, "data", "variant")
   if (is.null(variant)) {
     return(list(
       ok = FALSE,
-      error = paste0("gnomAD has no record for ", rsid, ".")
+      error = paste0("gnomAD has no record for ", label, ".")
     ))
   }
 
@@ -60,6 +69,27 @@ gnomad_frequency <- function(rsid, dataset = GNOMAD_DATASET) {
       pluck_at(variant, "genome", "populations")
     )
   )
+}
+
+# Plain message for a gnomAD GraphQL error. gnomAD reports a missing variant,
+# and an rsID it cannot resolve to one allele, as errors, not as empty data.
+gnomad_query_error <- function(errors, label) {
+  messages <- unlist(
+    lapply(errors, function(e) pluck_at(e, "message")),
+    use.names = FALSE
+  )
+  text <- tolower(paste(messages, collapse = " "))
+  if (grepl("not found", text, fixed = TRUE)) {
+    return(paste0("gnomAD has no record for ", label, "."))
+  }
+  if (grepl("multiple variants", text, fixed = TRUE)) {
+    return(paste0(
+      "gnomAD has more than one variant for ",
+      label,
+      ". Pick one allele in the Variant box to see its frequency."
+    ))
+  }
+  "gnomAD returned a query error."
 }
 
 # Display labels for gnomAD's genetic-ancestry group codes.
