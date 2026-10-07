@@ -360,12 +360,51 @@ test_that("clinvar_parse_record() extracts classification and conditions", {
   expect_match(res$accession, "^VCV")
 })
 
+test_that("clinvar_pick_uid() keeps the record for the allele's protein change", {
+  result <- read_fixture("clinvar_rs113488022_esummary.json")$result
+  ids <- c("40389", "13961")
+  records <- lapply(ids, function(id) result[[id]])
+
+  expect_equal(clinvar_pick_uid(ids, records, "p.Val600Glu"), "13961")
+  expect_equal(
+    clinvar_pick_uid(ids, records, c("p.Val640Gly", "p.Val600Gly")),
+    "40389"
+  )
+  # V600A has no ClinVar record of its own, so neither record is its.
+  expect_null(clinvar_pick_uid(ids, records, "p.Val600Ala"))
+  expect_null(clinvar_pick_uid(ids, records, character()))
+})
+
 test_that("gnomad_freq_part() normalizes a frequency block and handles NULL", {
   part <- gnomad_freq_part(list(af = 1.37e-6, ac = 2, an = 1460618))
   expect_equal(part$ac, 2)
   expect_equal(part$an, 1460618)
   expect_true(part$af > 0)
   expect_null(gnomad_freq_part(NULL))
+})
+
+test_that("gnomad_query_error() explains a missing and an unresolved variant", {
+  expect_match(
+    gnomad_query_error(
+      list(list(message = "Variant not found")),
+      "7-140753336-A-C"
+    ),
+    "no record for 7-140753336-A-C",
+    fixed = TRUE
+  )
+  expect_match(
+    gnomad_query_error(
+      list(list(
+        message = "Multiple variants found, query using variant ID to select one."
+      )),
+      "rs121913529"
+    ),
+    "Pick one allele"
+  )
+  expect_equal(
+    gnomad_query_error(list(list(message = "Syntax error")), "rs1"),
+    "gnomAD returned a query error."
+  )
 })
 
 test_that("gnomad_fmt_af() keeps tiny frequencies readable", {
@@ -385,6 +424,24 @@ test_that("ensembl_parse_vep() extracts consequence summary and table", {
     c("gene", "transcript", "consequence", "impact", "sift", "polyphen")
   )
   expect_true(all(res$data$gene == "BRAF"))
+})
+
+test_that("ensembl_vep_region() turns a VCF allele into VEP's region form", {
+  expect_equal(
+    ensembl_vep_region("7-140753336-A-T"),
+    "7:140753336-140753336:1/T"
+  )
+  # Deletion and insertion: VCF's shared leading base is dropped.
+  expect_equal(
+    ensembl_vep_region("7-117559590-ATCT-A"),
+    "7:117559591-117559593:1/-"
+  )
+  expect_equal(
+    ensembl_vep_region("7-117559594-T-TCTT"),
+    "7:117559595-117559594:1/CTT"
+  )
+  expect_null(ensembl_vep_region(NA_character_))
+  expect_null(ensembl_vep_region("rs113488022"))
 })
 
 test_that("ensembl_consequences_df() keeps only protein-coding rows", {

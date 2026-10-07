@@ -3,19 +3,27 @@
 
 ENSEMBL_BASE <- "https://rest.ensembl.org"
 
-# Run VEP for a variant id (rsID).
+# Run VEP for a variant. VEP by rsID runs every allele of the rsID at once (one
+# record with the consequences of all of them mixed), so when `vcf_id` names
+# the one allele being reviewed, VEP is run on that allele's region instead.
 # Returns:
 #   list(ok = TRUE, most_severe, assembly,
 #        data = data.frame(gene, transcript, consequence, impact, sift, polyphen))
 #   list(ok = FALSE, error = "...")
-ensembl_vep <- function(rsid) {
-  if (is_blank(rsid)) {
+ensembl_vep <- function(rsid, vcf_id = NULL) {
+  region <- ensembl_vep_region(vcf_id)
+  if (is.null(region) && is_blank(rsid)) {
     return(list(ok = FALSE, error = "No rsID available for VEP lookup."))
   }
+  label <- if (is.null(region)) rsid else vcf_id
 
   res <- vr_api_get(
     ENSEMBL_BASE,
-    path = paste0("vep/human/id/", rsid),
+    path = if (is.null(region)) {
+      paste0("vep/human/id/", rsid)
+    } else {
+      paste0("vep/human/region/", region)
+    },
     query = list(`content-type` = "application/json"),
     source = "Ensembl VEP"
   )
@@ -26,11 +34,48 @@ ensembl_vep <- function(rsid) {
   if (is.null(records) || length(records) == 0) {
     return(list(
       ok = FALSE,
-      error = paste0("Ensembl VEP has no record for ", rsid, ".")
+      error = paste0("Ensembl VEP has no record for ", label, ".")
     ))
   }
 
   ensembl_parse_vep(records[[1]])
+}
+
+# VEP's region form of a chrom-pos-ref-alt allele (GRCh38), or NULL when it is
+# not one. VCF adds a shared leading base to insertions and deletions, which
+# VEP's form leaves out, and an insertion's region ends one base before it
+# starts:
+#   7-140753336-A-T    -> 7:140753336-140753336:1/T
+#   7-117559590-ATCT-A -> 7:117559591-117559593:1/-
+#   7-117559594-T-TCTT -> 7:117559595-117559594:1/CTT
+ensembl_vep_region <- function(vcf_id) {
+  if (is_blank(vcf_id)) {
+    return(NULL)
+  }
+  parts <- strsplit(as.character(vcf_id), "-", fixed = TRUE)[[1]]
+  if (length(parts) != 4 || !all(grepl("^[ACGTN]+$", parts[3:4]))) {
+    return(NULL)
+  }
+  pos <- suppressWarnings(as.integer(parts[[2]]))
+  ref <- parts[[3]]
+  alt <- parts[[4]]
+  if (is.na(pos)) {
+    return(NULL)
+  }
+  if (nchar(ref) != nchar(alt) && substr(ref, 1, 1) == substr(alt, 1, 1)) {
+    ref <- substring(ref, 2)
+    alt <- substring(alt, 2)
+    pos <- pos + 1L
+  }
+  paste0(
+    parts[[1]],
+    ":",
+    pos,
+    "-",
+    pos + nchar(ref) - 1L,
+    ":1/",
+    if (nzchar(alt)) alt else "-"
+  )
 }
 
 # Pure parser: a VEP record -> normalized result.
