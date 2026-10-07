@@ -1,5 +1,5 @@
 {
-  "took": 53,
+  "took": 6,
   "total": 1,
   "max_score": 1.0,
   "hits": [
@@ -62,6 +62,7 @@
             "clinical_significance": "Uncertain significance"
           }
         ],
+        "rsid": "rs113488022",
         "variant_id": 13961
       },
       "dbnsfp": {
@@ -74,6 +75,11 @@
           "BRAF",
           "BRAF",
           "BRAF"
+        ],
+        "hgvsc": [
+          "c.620T>A",
+          "c.1919T>A",
+          "c.1799T>A"
         ],
         "hgvsp": [
           "p.Val640Glu",
@@ -89,6 +95,7 @@
       "snpeff": {
         "_license": "http://bit.ly/2suyRKt",
         "ann": {
+          "hgvs_c": "c.1799T>A",
           "hgvs_p": "p.Val600Glu"
         }
       },

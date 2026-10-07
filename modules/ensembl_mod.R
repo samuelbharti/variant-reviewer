@@ -28,10 +28,18 @@ ensembl_server <- function(id, rsid, allele = reactive(NULL)) {
       if (isTRUE(picked$ambiguous)) {
         return(vr_allele_needed("VEP consequences"))
       }
-      if (is_blank(id_value) && is.null(ensembl_vep_region(picked$vcf_id))) {
+      # A picked allele is run by its region only. By rsID, VEP runs every
+      # allele of the rsID together.
+      if (!is.null(picked)) {
+        if (is.null(ensembl_vep_region(picked$vcf_id))) {
+          return(vr_allele_unplaced("Ensembl VEP"))
+        }
+        return(ensembl_vep(id_value, vcf_id = picked$vcf_id))
+      }
+      if (is_blank(id_value)) {
         return(NULL)
       }
-      ensembl_vep(id_value, vcf_id = picked$vcf_id)
+      ensembl_vep(id_value)
     })
 
     output$source <- renderUI({

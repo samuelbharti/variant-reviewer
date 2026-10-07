@@ -32,10 +32,13 @@ gnomad_server <- function(id, rsid, allele = reactive(NULL)) {
       if (isTRUE(picked$ambiguous)) {
         return(vr_allele_needed("population frequency"))
       }
-      if (is_blank(id_value) && is_blank(picked$vcf_id)) {
+      if (!is.null(picked)) {
+        return(gnomad_allele_frequency(id_value, picked$vcf_id))
+      }
+      if (is_blank(id_value)) {
         return(NULL)
       }
-      gnomad_frequency(id_value, variant_id = picked$vcf_id)
+      gnomad_frequency(id_value)
     })
 
     output$source <- renderUI({

@@ -1,5 +1,5 @@
 {
-  "took": 18,
+  "took": 12,
   "total": 3,
   "max_score": 12.36808,
   "hits": [
@@ -18,6 +18,11 @@
           "BRAF",
           "BRAF"
         ],
+        "hgvsc": [
+          "c.1919T>C",
+          "c.620T>C",
+          "c.1799T>C"
+        ],
         "hgvsp": [
           "p.Val600Ala",
           "p.Val640Ala",
@@ -32,6 +37,7 @@
       "snpeff": {
         "_license": "http://bit.ly/2suyRKt",
         "ann": {
+          "hgvs_c": "c.1799T>C",
           "hgvs_p": "p.Val600Ala"
         }
       },
@@ -58,6 +64,7 @@
             "clinical_significance": "Uncertain significance"
           }
         ],
+        "rsid": "rs113488022",
         "variant_id": 40389
       },
       "dbnsfp": {
@@ -70,6 +77,11 @@
           "BRAF",
           "BRAF",
           "BRAF"
+        ],
+        "hgvsc": [
+          "c.620T>G",
+          "c.1799T>G",
+          "c.1919T>G"
         ],
         "hgvsp": [
           "p.V600G",
@@ -85,6 +97,7 @@
       "snpeff": {
         "_license": "http://bit.ly/2suyRKt",
         "ann": {
+          "hgvs_c": "c.1799T>G",
           "hgvs_p": "p.Val600Gly"
         }
       },
@@ -153,6 +166,7 @@
             "clinical_significance": "Uncertain significance"
           }
         ],
+        "rsid": "rs113488022",
         "variant_id": 13961
       },
       "dbnsfp": {
@@ -165,6 +179,11 @@
           "BRAF",
           "BRAF",
           "BRAF"
+        ],
+        "hgvsc": [
+          "c.620T>A",
+          "c.1919T>A",
+          "c.1799T>A"
         ],
         "hgvsp": [
           "p.Val640Glu",
@@ -180,6 +199,7 @@
       "snpeff": {
         "_license": "http://bit.ly/2suyRKt",
         "ann": {
+          "hgvs_c": "c.1799T>A",
           "hgvs_p": "p.Val600Glu"
         }
       },

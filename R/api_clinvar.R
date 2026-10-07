@@ -10,8 +10,8 @@ EUTILS_BASE <- "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 # NULL. ClinVar keeps one record per allele, so an rsID can return several
 # (rs113488022 returns V600G's and V600E's). With an allele, the record is its
 # own: the ClinVar variation id MyVariant has for it, else the record whose
-# title names its protein change. Without one, a single record is used and
-# several are an error, since picking one would be a guess.
+# title names its cDNA change (see clinvar_pick_uid()). Without one, a single
+# record is used and several are an error, since picking one would be a guess.
 # Returns:
 #   list(ok = TRUE, uid, accession, title, significance, review_status,
 #        last_evaluated, conditions)
@@ -68,7 +68,12 @@ clinvar_classification <- function(term, allele = NULL) {
     return(list(ok = FALSE, error = summary$error))
   }
   records <- lapply(ids, function(id) pluck_at(summary$data, "result", id))
-  uid <- clinvar_pick_uid(ids, records, allele$hgvsp_all)
+  uid <- clinvar_pick_uid(
+    ids,
+    records,
+    cdna = allele$hgvsc_all,
+    protein = allele$hgvsp_all
+  )
   if (is.null(uid)) {
     return(list(
       ok = FALSE,
@@ -111,23 +116,39 @@ clinvar_fetch_record <- function(uid) {
   clinvar_parse_record(record, uid)
 }
 
-# Pure helper: the uid of the record whose title names one of `changes` (e.g.
-# "(p.Val600Glu)" in "NM_004333.6(BRAF):c.1799T>A (p.Val600Glu)"), or NULL.
-clinvar_pick_uid <- function(ids, records, changes) {
-  if (length(changes) == 0) {
-    return(NULL)
-  }
+# Pure helper: the uid of the record whose title names the allele, or NULL. A
+# title reads like "NM_004333.6(BRAF):c.1799T>A (p.Val600Glu)". When the allele
+# has cDNA changes, only those count: two alleles at one position can share a
+# protein change (both TTA>TTT and TTA>TTC are Leu>Phe) but never a cDNA
+# change. The protein change is used only when no cDNA change is known.
+clinvar_pick_uid <- function(
+  ids,
+  records,
+  cdna = character(),
+  protein = character()
+) {
   titles <- vapply(
     records,
     function(r) as.character(pluck_at(r, "title", default = "")),
     character(1)
   )
-  needles <- paste0("(", changes, ")")
-  named <- vapply(
-    titles,
-    function(t) any(vapply(needles, grepl, logical(1), x = t, fixed = TRUE)),
-    logical(1)
-  )
+  named <- if (length(cdna) > 0) {
+    title_cdna <- ifelse(
+      grepl(":c\\.[^ ]+", titles),
+      sub("^.*?:(c\\.[^ ]+).*$", "\\1", titles, perl = TRUE),
+      ""
+    )
+    sub("(del|dup)[ACGTN]+$", "\\1", title_cdna) %in% cdna
+  } else if (length(protein) > 0) {
+    needles <- paste0("(", protein, ")")
+    vapply(
+      titles,
+      function(t) any(vapply(needles, grepl, logical(1), x = t, fixed = TRUE)),
+      logical(1)
+    )
+  } else {
+    logical(length(ids))
+  }
   if (!any(named)) NULL else as.character(ids[[which(named)[[1]]]])
 }
 

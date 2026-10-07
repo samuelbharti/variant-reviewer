@@ -52,6 +52,7 @@ test_that("myvariant_parse_hit() describes the one allele it was given", {
   # snpEff's RefSeq protein change, not dbNSFP's first isoform (p.Val640Glu).
   expect_equal(res$hgvsp, "p.Val600Glu")
   expect_true("p.Val600Glu" %in% res$hgvsp_all)
+  expect_true("c.1799T>A" %in% res$hgvsc_all)
   # hg38 records have no CADD block of their own; dbNSFP's score is used.
   expect_true(is.numeric(res$cadd_phred) && !is.na(res$cadd_phred))
   expect_equal(res$clinvar_id, "13961")
@@ -64,6 +65,42 @@ test_that("myvariant_query_term() quotes HGVS so MyVariant matches it", {
     myvariant_query_term(" chr7:g.140753336A>T "),
     "\"chr7:g.140753336A>T\""
   )
+  # A quote typed inside is escaped, so it cannot end the phrase early.
+  expect_equal(myvariant_query_term("chr7:g.1\"A>T"), "\"chr7:g.1\\\"A>T\"")
+})
+
+test_that("myvariant_rsid() falls back to the rsID in the ClinVar block", {
+  expect_equal(
+    myvariant_rsid(list(clinvar = list(rsid = "rs113993960"))),
+    "rs113993960"
+  )
+  expect_equal(
+    myvariant_rsid(list(
+      dbsnp = list(rsid = "rs1"),
+      clinvar = list(rsid = "rs2")
+    )),
+    "rs1"
+  )
+  expect_true(is.na(myvariant_rsid(list())))
+})
+
+test_that("myvariant_hgvsc_all() collects cDNA changes in ClinVar's form", {
+  hit <- list(
+    snpeff = list(ann = list(hgvs_c = "c.1521_1523delCTT")),
+    dbnsfp = list(hgvsc = list("c.620T>A", "c.1799T>A"))
+  )
+  expect_setequal(
+    myvariant_hgvsc_all(hit),
+    c("c.1521_1523del", "c.620T>A", "c.1799T>A")
+  )
+  expect_length(myvariant_hgvsc_all(list()), 0)
+})
+
+test_that("myvariant_same_vcf_id() matches one indel written two ways", {
+  expect_true(myvariant_same_vcf_id("7-117559590-ATCT-A", "7-117559591-TCTT-T"))
+  expect_false(myvariant_same_vcf_id("7-140753336-A-T", "7-140753336-A-C"))
+  expect_false(myvariant_same_vcf_id("7-140753336-A-T", NA_character_))
+  expect_false(myvariant_same_vcf_id("7-140753336-A-T", "rs113488022"))
 })
 
 test_that("myvariant_pick_allele() lists the alleles of a multi-allele rsID", {
@@ -360,19 +397,25 @@ test_that("clinvar_parse_record() extracts classification and conditions", {
   expect_match(res$accession, "^VCV")
 })
 
-test_that("clinvar_pick_uid() keeps the record for the allele's protein change", {
+test_that("clinvar_pick_uid() keeps the record for the allele's cDNA change", {
   result <- read_fixture("clinvar_rs113488022_esummary.json")$result
   ids <- c("40389", "13961")
   records <- lapply(ids, function(id) result[[id]])
 
-  expect_equal(clinvar_pick_uid(ids, records, "p.Val600Glu"), "13961")
+  expect_equal(clinvar_pick_uid(ids, records, cdna = "c.1799T>A"), "13961")
   expect_equal(
-    clinvar_pick_uid(ids, records, c("p.Val640Gly", "p.Val600Gly")),
+    clinvar_pick_uid(ids, records, cdna = c("c.620T>G", "c.1799T>G")),
     "40389"
   )
-  # V600A has no ClinVar record of its own, so neither record is its.
-  expect_null(clinvar_pick_uid(ids, records, "p.Val600Ala"))
-  expect_null(clinvar_pick_uid(ids, records, character()))
+  # V600A (c.1799T>C) has no ClinVar record of its own. A known cDNA change
+  # is the only thing matched, so a protein change cannot pull in another
+  # allele's record.
+  expect_null(
+    clinvar_pick_uid(ids, records, cdna = "c.1799T>C", protein = "p.Val600Glu")
+  )
+  # With no cDNA change known, the protein change is used.
+  expect_equal(clinvar_pick_uid(ids, records, protein = "p.Val600Glu"), "13961")
+  expect_null(clinvar_pick_uid(ids, records))
 })
 
 test_that("gnomad_freq_part() normalizes a frequency block and handles NULL", {
@@ -383,28 +426,18 @@ test_that("gnomad_freq_part() normalizes a frequency block and handles NULL", {
   expect_null(gnomad_freq_part(NULL))
 })
 
-test_that("gnomad_query_error() explains a missing and an unresolved variant", {
-  expect_match(
-    gnomad_query_error(
-      list(list(message = "Variant not found")),
-      "7-140753336-A-C"
-    ),
-    "no record for 7-140753336-A-C",
-    fixed = TRUE
-  )
-  expect_match(
-    gnomad_query_error(
-      list(list(
-        message = "Multiple variants found, query using variant ID to select one."
-      )),
-      "rs121913529"
-    ),
-    "Pick one allele"
+test_that("gnomad_error_kind() tells a missing from an unresolved variant", {
+  expect_equal(
+    gnomad_error_kind(list(list(message = "Variant not found"))),
+    "missing"
   )
   expect_equal(
-    gnomad_query_error(list(list(message = "Syntax error")), "rs1"),
-    "gnomAD returned a query error."
+    gnomad_error_kind(list(list(
+      message = "Multiple variants found, query using variant ID to select one."
+    ))),
+    "multiple"
   )
+  expect_equal(gnomad_error_kind(list(list(message = "Syntax error"))), "other")
 })
 
 test_that("gnomad_fmt_af() keeps tiny frequencies readable", {

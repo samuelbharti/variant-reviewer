@@ -3163,7 +3163,7 @@
       "checksum": "465abdefd666e3558e2b8566082362de"
     },
     "modules/ensembl_mod.R": {
-      "checksum": "ca2a43b0d35b51b6efb493dc30f5ac2e"
+      "checksum": "726f5ce954e5e94e0c5fc18131d31a2f"
     },
     "modules/external_links_mod.R": {
       "checksum": "efd22d57d02ac6006c314135cc80a892"
@@ -3184,7 +3184,7 @@
       "checksum": "4c9fa65b401cab23169617383cabd782"
     },
     "modules/gnomad_mod.R": {
-      "checksum": "8cae135fe92972884f6e7d98ffb2b223"
+      "checksum": "7faf5c5f6d9c9de26c025cdda3adb966"
     },
     "modules/gtex_expression_mod.R": {
       "checksum": "eb9e1530ed5b0fc4340c069efc8c0a47"
@@ -3229,7 +3229,7 @@
       "checksum": "f829a3c697dcc28cbc4c1bbe0c8df5ba"
     },
     "R/api_clinvar.R": {
-      "checksum": "56643a60123b32019d1b5ab517919e84"
+      "checksum": "c06cc569d9336320c33e70fd4ffdd55f"
     },
     "R/api_ensembl.R": {
       "checksum": "281421778fee37549c3abe413e26aec4"
@@ -3238,7 +3238,7 @@
       "checksum": "9e8e094c40839c41da89e1eb250588b5"
     },
     "R/api_gnomad.R": {
-      "checksum": "7a921942c45cfafa594642dcd49b7b93"
+      "checksum": "ca5f1a1648cb2234dc051dd41d23697c"
     },
     "R/api_gtex.R": {
       "checksum": "628e02fd3485bb36428e2afa3f4e5d51"
@@ -3253,7 +3253,7 @@
       "checksum": "5f7319a7f745e72d119979e2b23186d7"
     },
     "R/api_myvariant.R": {
-      "checksum": "e8f3261fe06bac531f34f117b2791f75"
+      "checksum": "11decaffbd5559fdc8889c76ca7a52b1"
     },
     "R/api_opentargets.R": {
       "checksum": "9cb02ff7792befc2f465c972f58337db"
