@@ -92,19 +92,29 @@ gene_search_ui <- function(id) {
 # the visible inputs are filled and the same submit path runs. Callers cannot
 # write the query directly, so the search box stays the only way a search
 # starts.
-gene_search_server <- function(id, requested = reactiveVal(NULL)) {
+#
+# `allele_choices` is an optional reactive of extra Variant choices (value =
+# HGVS id, name = label). The parent fills it with the alleles of an rsID that
+# covers several, so the user can pick one from the list the cards point to.
+gene_search_server <- function(
+  id,
+  requested = reactiveVal(NULL),
+  allele_choices = reactive(NULL)
+) {
   moduleServer(id, function(input, output, session) {
     query <- reactiveVal(NULL)
     # Validation messages from the last submit (character vector), or NULL.
     validation <- reactiveVal(NULL)
     # Parsed variant suggestions for the current gene, or NULL.
     suggestions <- reactiveVal(NULL)
+    # The alleles of the last searched rsID that are in the Variant list.
+    shown_alleles <- reactiveVal(character())
 
     # Update the variant selectize's choices while preserving whatever the user
     # has already typed/selected (kept as an extra option so it stays visible
     # even when it isn't among the suggestions).
-    refresh_variant_choices <- function(choices = character()) {
-      current <- isolate(input$variant) %||% ""
+    refresh_variant_choices <- function(choices = character(), current = NULL) {
+      current <- current %||% isolate(input$variant) %||% ""
       if (nzchar(current) && !(current %in% choices)) {
         choices <- c(stats::setNames(current, current), choices)
       }
@@ -130,8 +140,38 @@ gene_search_server <- function(id, requested = reactiveVal(NULL)) {
       }
       parsed <- myvariant_gene_variants(gene)
       suggestions(parsed)
-      refresh_variant_choices(myvariant_variant_choices(parsed))
+      refresh_variant_choices(c(
+        shown_alleles(),
+        myvariant_variant_choices(parsed)
+      ))
     })
+
+    # An rsID's alleles go to the top of the list, next to the gene's
+    # suggestions. The variant that was searched stays selected. It is read
+    # from the query, not the input: when the assistant has just filled the
+    # box, the input still holds the old value. When the next search has no
+    # alleles to offer, the old ones go, except the one now selected, which
+    # keeps its label.
+    observeEvent(
+      allele_choices(),
+      {
+        extra <- allele_choices()
+        searched <- isolate(query())$variant %||% ""
+        if (length(extra) == 0) {
+          if (length(shown_alleles()) == 0) {
+            return()
+          }
+          extra <- shown_alleles()[shown_alleles() %in% searched]
+        }
+        shown_alleles(extra)
+        refresh_variant_choices(
+          c(extra, myvariant_variant_choices(isolate(suggestions()))),
+          current = searched
+        )
+      },
+      ignoreNULL = FALSE,
+      ignoreInit = TRUE
+    )
 
     output$variant_hint <- renderUI({
       parsed <- suggestions()

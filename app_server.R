@@ -5,8 +5,31 @@ function(input, output, session) {
   # than writing the query (or any card) itself.
   assistant_search <- reactiveVal(NULL)
 
+  # The alleles of a searched rsID that covers several, as Variant choices
+  # (value = HGVS id, name = protein change and id), so the list the cards
+  # point to is there to pick from. It reads annotation_raw, defined below;
+  # a reactive only looks it up when it runs.
+  allele_choices <- reactive({
+    alleles <- annotation_raw()$alleles
+    if (is.null(alleles) || nrow(alleles) == 0) {
+      return(NULL)
+    }
+    stats::setNames(
+      alleles$id,
+      ifelse(
+        is.na(alleles$hgvsp),
+        alleles$id,
+        paste0(alleles$hgvsp, " (", alleles$id, ")")
+      )
+    )
+  })
+
   # Submitted search query: reactive(list(gene, variant)) or NULL.
-  search <- gene_search_server("search", requested = assistant_search)
+  search <- gene_search_server(
+    "search",
+    requested = assistant_search,
+    allele_choices = allele_choices
+  )
 
   # Raw MyVariant annotation for the entered variant. Shared so the fetch runs
   # once; the card-facing variant_annotation below gates it on the gene and
