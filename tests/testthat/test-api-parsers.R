@@ -282,7 +282,6 @@ test_that("a hit's ClinVar block is dropped when it is another allele's", {
   res <- myvariant_parse_hit(hit)
   expect_equal(res$rsid, "rs2051500205")
   expect_true(is.na(res$clinvar_id))
-  expect_true(is.na(res$clinvar_significance))
   expect_true(is.na(res$gene))
 
   # The same block on a record with no dbSNP rsID is kept.
@@ -707,25 +706,22 @@ test_that("myvariant_predictions() rejects non-queryable input", {
   expect_match(res$error, "rsID")
 })
 
-test_that("myvariant_parse_gene_variants() builds a ranked variant table", {
+test_that("myvariant_parse_gene_variants() builds a table sorted by position", {
   hits <- read_fixture("myvariant_gene_variants_braf.json")$hits
   res <- myvariant_parse_gene_variants(hits)
   expect_true(res$ok)
   v <- res$variants
-  expect_true(all(
-    c("id", "rsid", "label", "significance", "cadd") %in% names(v)
-  ))
+  # No classification column: the list is not a verdict.
+  expect_named(v, c("id", "rsid", "label", "position"))
   # One row per allele; rsIDs are lower-cased.
   expect_equal(anyDuplicated(v$id), 0L)
   expect_true(all(grepl("^rs[0-9]+$", v$rsid)))
   # Amino-acid labels take the one-letter ref+pos+alt form (e.g. L485S).
   expect_true(any(grepl("^[A-Z][0-9]+[A-Z*]$", v$label)))
-  # Every suggestion is pathogenic/likely-pathogenic, most severe ranked first.
-  expect_true(all(v$significance %in% c("Pathogenic", "Likely pathogenic")))
-  expect_false(is.unsorted(match(
-    v$significance,
-    c("Pathogenic", "Likely pathogenic")
-  )))
+  # Sorted by protein position, with no-position rows last.
+  placed <- v$position[!is.na(v$position)]
+  expect_false(is.unsorted(placed))
+  expect_false(is.unsorted(is.na(v$position)))
 })
 
 test_that("myvariant_parse_gene_variants() keeps each allele of an rsID", {
@@ -757,16 +753,34 @@ test_that("myvariant_parse_gene_variants() keeps each allele of an rsID", {
   )
   expect_equal(res$variants$rsid, c("rs1", "rs1"))
   expect_equal(res$variants$label, c("V600E", "V600G"))
+  expect_equal(res$variants$position, c(600L, 600L))
 })
 
 test_that("myvariant_variant_choices() maps display labels to allele ids", {
   parsed <- myvariant_parse_gene_variants(
     read_fixture("myvariant_gene_variants_braf.json")$hits
   )
-  choices <- myvariant_variant_choices(parsed, max_n = 3)
-  expect_length(choices, 3)
+  choices <- myvariant_variant_choices(parsed)
+  expect_length(choices, nrow(parsed$variants))
   expect_true(all(grepl("^chr[0-9XY]+:g\\.", unname(choices))))
-  expect_match(names(choices)[1], "\\(")
+  # "V600E, rs113488022" or the rsID alone; never a classification.
+  expect_false(any(grepl("Pathogenic", names(choices), fixed = TRUE)))
+  expect_true(any(grepl("^[A-Z][0-9]+[A-Z*], rs[0-9]+$", names(choices))))
+  # Two alleles with one label each get their HGVS id.
+  twins <- list(
+    ok = TRUE,
+    variants = data.frame(
+      id = c("chr7:g.1C>A", "chr7:g.1C>G"),
+      rsid = "rs1",
+      label = "N236K",
+      position = 236L,
+      stringsAsFactors = FALSE
+    )
+  )
+  expect_equal(
+    names(myvariant_variant_choices(twins)),
+    c("N236K, rs1 (chr7:g.1C>A)", "N236K, rs1 (chr7:g.1C>G)")
+  )
   # No suggestions for a failed parse.
   expect_length(myvariant_variant_choices(list(ok = FALSE)), 0)
 })
