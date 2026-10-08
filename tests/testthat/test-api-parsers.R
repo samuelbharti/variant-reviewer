@@ -972,3 +972,325 @@ test_that("ensembl_parse_gene_model picks the canonical transcript's exons", {
 
   expect_false(ensembl_parse_gene_model(list(Transcript = list()))$ok)
 })
+
+# A reference accessor over a made-up stretch that starts at `from`.
+ref_accessor <- function(seq, from) {
+  function(start, end) {
+    if (start < from || end > from + nchar(seq) - 1 || end < start) {
+      return(NULL)
+    }
+    substr(seq, start - from + 1, end - from + 1)
+  }
+}
+
+test_that(".mv_hgvs_to_vcf() reads the HGVS forms MyVariant uses", {
+  # Positions 100-109: G A C T C T G C C C
+  ref_at <- ref_accessor("GACTCTGCCC", 100L)
+  vcf <- function(pos, ref, alt) {
+    list(chrom = "17", pos = pos, ref = ref, alt = alt)
+  }
+  expect_equal(.mv_hgvs_to_vcf("chr17:g.101A>T", ref_at), vcf(101L, "A", "T"))
+  expect_equal(
+    .mv_hgvs_to_vcf("chr17:g.103_104del", ref_at),
+    vcf(102L, "CTC", "C")
+  )
+  expect_equal(.mv_hgvs_to_vcf("chr17:g.109dup", ref_at), vcf(109L, "C", "CC"))
+  expect_equal(
+    .mv_hgvs_to_vcf("chr17:g.101_102insTT", ref_at),
+    vcf(101L, "A", "ATT")
+  )
+  expect_equal(
+    .mv_hgvs_to_vcf("chr17:g.103_104delinsGG", ref_at),
+    vcf(102L, "CTC", "CGG")
+  )
+  # A repeat, as MyVariant writes BRCA1 185delAG: two CT copies from 102,
+  # one left.
+  expect_equal(
+    .mv_hgvs_to_vcf("chr17:g.102CT[1]", ref_at),
+    vcf(103L, "TCT", "T")
+  )
+  expect_equal(
+    .mv_hgvs_to_vcf("chr17:g.102CT[3]", ref_at),
+    vcf(105L, "T", "TCT")
+  )
+  expect_null(.mv_hgvs_to_vcf("NM_007294.4:c.68_69del", ref_at))
+  expect_null(.mv_hgvs_to_vcf("chr17:g.102CT[2]", ref_at))
+})
+
+test_that("myvariant_vcf() falls back to the hit's own ClinVar block", {
+  # GJB2 35dupG: MyVariant's id is wrong, its ClinVar block is right.
+  hit <- list(
+    `_id` = "chr13:g.20189546_20189547dup",
+    clinvar = list(
+      rsid = "rs80338939",
+      chrom = "13",
+      hg38 = list(start = 20189546L, end = 20189547L),
+      ref = "A",
+      alt = "AC"
+    )
+  )
+  expect_equal(myvariant_vcf_id(hit), "13-20189546-A-AC")
+  # Another allele's ClinVar block is not used.
+  hit$dbsnp <- list(rsid = "rs1")
+  expect_true(is.na(myvariant_vcf_id(hit)))
+})
+
+test_that("myvariant_place_hits() gives one indel one leftmost position", {
+  # Stub the reference: GJB2 around its run of six Cs (20189547-20189552).
+  orig <- vr_reference_sequence
+  seq <- paste0(strrep("T", 10), "GTTCACACCCCCCAGGA", strrep("T", 10))
+  vr_reference_sequence <<- function(chrom, start, end) {
+    ref_accessor(seq, 20189530L)(start, end)
+  }
+  on.exit(vr_reference_sequence <<- orig, add = TRUE)
+
+  hit <- function(id, pos, ref, alt) {
+    list(
+      `_id` = id,
+      chrom = "13",
+      vcf = list(position = pos, ref = ref, alt = alt),
+      dbsnp = list(rsid = "rs80338939")
+    )
+  }
+  hits <- list(
+    hit("chr13:g.20189552del", "20189551", "CC", "C"),
+    hit("chr13:g.20189547del", "20189546", "AC", "A"),
+    # No VCF fields: placed from its HGVS id.
+    list(`_id` = "chr13:g.20189552dup", dbsnp = list(rsid = "rs80338939"))
+  )
+  placed <- myvariant_place_hits(hits, margin = 5L)
+  places <- vapply(placed, function(h) h$.place %||% NA_character_, "")
+  expect_equal(
+    places,
+    c("13-20189546-AC-A", "13-20189546-AC-A", "13-20189546-A-AC")
+  )
+  # The two deletions now count as one allele.
+  expect_length(myvariant_distinct_alleles(placed), 2)
+  expect_equal(myvariant_parse_hit(placed[[3]])$vcf_id, "13-20189546-A-AC")
+
+  # Without the reference, the hits come back as they were.
+  vr_reference_sequence <<- function(chrom, start, end) NULL
+  expect_identical(myvariant_place_hits(hits), hits)
+})
+
+test_that("clinvar_pick_uid() matches the exact change through SPDI", {
+  # BRCA1 185delAG: ClinVar writes the whole repeat, our allele is leftmost.
+  record <- list(
+    title = "NM_007294.4(BRCA1):c.68_69del (p.Glu23fs)",
+    variation_set = list(list(canonical_spdi = "NC_000017.11:43124027:CTCT:CT"))
+  )
+  expect_equal(
+    clinvar_pick_uid("17662", list(record), vcf_id = "17-43124027-ACT-A"),
+    "17662"
+  )
+  # The duplication at the same repeat is another change.
+  expect_null(
+    clinvar_pick_uid("17662", list(record), vcf_id = "17-43124027-A-ACT")
+  )
+  expect_equal(
+    clinvar_spdi_change("NC_000023.11:99:A:G"),
+    list(chrom = "X", pos = 100L, ref = "A", alt = "G")
+  )
+  expect_null(clinvar_spdi_change("NT_187361.1:99:A:G"))
+})
+
+test_that("clinvar_spdi_change() keeps the empty alt of a deletion", {
+  # BRCA2 c.4658del: strsplit() would drop the last, empty field.
+  change <- clinvar_spdi_change("NC_000013.11:32339012:C:")
+  expect_equal(change, list(chrom = "13", pos = 32339013L, ref = "C", alt = ""))
+  expect_true(.mv_same_change(change, .mv_parse_vcf_id("13-32339012-AC-A")))
+  # An insertion outside a repeat has an empty ref.
+  expect_true(.mv_same_change(
+    clinvar_spdi_change("NC_000013.11:20189546::C"),
+    .mv_parse_vcf_id("13-20189546-A-AC")
+  ))
+})
+
+test_that("clinvar_record_fits() trusts the exact change, then the title", {
+  own <- list(
+    title = "NM_000059.4(BRCA2):c.4658del (p.Leu1553fs)",
+    spdi = "NC_000013.11:32339012:C:"
+  )
+  # The exact change decides, even with no cDNA or protein name.
+  expect_true(clinvar_record_fits(own, "13-32339012-AC-A"))
+  expect_false(clinvar_record_fits(own, "13-32339012-A-AC"))
+  # A haplotype has no single SPDI; its title does not name the allele.
+  haplotype <- list(title = "NM_000041.4(APOE):c.[526C>T;725G>A]")
+  expect_false(
+    clinvar_record_fits(haplotype, "19-44908822-C-T", cdna = "c.526C>T")
+  )
+  # Nothing to check against: the record stands.
+  expect_true(clinvar_record_fits(haplotype, NA_character_))
+})
+
+test_that("myvariant_vcf() places a ClinVar deletion at its anchor base", {
+  # ClinVar's start is the first deleted base; ref and alt carry the base
+  # before it (GJB2 35delG, ClinVar 17004).
+  hit <- list(
+    clinvar = list(
+      rsid = "rs80338939",
+      chrom = "13",
+      hg38 = list(start = 20189547L, end = 20189547L),
+      ref = "AC",
+      alt = "A"
+    )
+  )
+  expect_equal(myvariant_vcf_id(hit), "13-20189546-AC-A")
+})
+
+test_that(".mv_hgvs_to_vcf() gives up on a repeat that runs past the reference", {
+  # Positions 100-105: G C T C T C, and nothing known after 105.
+  ref_at <- ref_accessor("GCTCTC", 100L)
+  expect_null(.mv_hgvs_to_vcf("chr17:g.101CT[1]", ref_at))
+})
+
+test_that(".mv_trim_same_length() drops the bases ref and alt share", {
+  expect_equal(
+    .mv_trim_same_length(102L, "CTC", "CGG"),
+    list(pos = 103L, ref = "TC", alt = "GG")
+  )
+  expect_equal(
+    .mv_trim_same_length(100L, "A", "T"),
+    list(pos = 100L, ref = "A", alt = "T")
+  )
+})
+
+test_that("vr_reference_sequence() falls back to Ensembl, then pauses a failing source", {
+  orig <- vr_api_get
+  asked <- character()
+  ucsc_ok <- TRUE
+  vr_api_get <<- function(base_url, path = NULL, query = list(), source, ...) {
+    asked <<- c(asked, source)
+    if (source == "UCSC") {
+      if (ucsc_ok) {
+        return(list(ok = TRUE, status = 200L, data = list(dna = "acgt")))
+      }
+      return(list(ok = FALSE, status = 500L, error = "down"))
+    }
+    list(ok = TRUE, status = 200L, data = list(seq = "ACGT"))
+  }
+  on.exit(vr_api_get <<- orig, add = TRUE)
+  rm(list = ls(.reference_state), envir = .reference_state)
+  on.exit(rm(list = ls(.reference_state), envir = .reference_state), add = TRUE)
+
+  # UCSC answers first, upper-cased.
+  expect_equal(vr_reference_sequence("7", 10L, 13L), "ACGT")
+  expect_equal(asked, "UCSC")
+
+  # UCSC down: Ensembl answers, and UCSC is not asked again for a while.
+  ucsc_ok <- FALSE
+  asked <- character()
+  expect_equal(vr_reference_sequence("7", 10L, 13L), "ACGT")
+  expect_equal(asked, c("UCSC", "Ensembl"))
+  asked <- character()
+  expect_equal(vr_reference_sequence("7", 10L, 13L), "ACGT")
+  expect_equal(asked, "Ensembl")
+})
+
+test_that("a record's own ClinVar position is preferred, and checked", {
+  # NPM1: MyVariant's VCF fields come from a wrong id; the ClinVar block is
+  # right.
+  hit <- list(
+    `_id` = "chr5:g.10_11insCATG",
+    chrom = "5",
+    vcf = list(position = "10", ref = "C", alt = "CCATG"),
+    dbsnp = list(rsid = "rs1"),
+    clinvar = list(
+      rsid = "rs1",
+      chrom = "5",
+      hg38 = list(start = 10L, end = 11L),
+      ref = "C",
+      alt = "CTGCA"
+    )
+  )
+  candidates <- myvariant_vcf_candidates(hit)
+  expect_equal(candidates[[1]]$alt, "CTGCA")
+  expect_equal(candidates[[2]]$alt, "CCATG")
+
+  # With the reference, a candidate whose ref does not match is skipped.
+  orig <- vr_reference_sequence
+  vr_reference_sequence <<- function(chrom, start, end) {
+    ref_accessor("AAAACGTTGAAAAA", 6L)(start, end)
+  }
+  on.exit(vr_reference_sequence <<- orig, add = TRUE)
+  wrong <- hit
+  wrong$clinvar$ref <- "G"
+  # Placing runs for two or more indels; the second is any other one.
+  other <- list(
+    `_id` = "chr5:g.13del",
+    chrom = "5",
+    vcf = list(position = "12", ref = "TT", alt = "T")
+  )
+  placed <- myvariant_place_hits(list(wrong, other), margin = 2L)
+  expect_equal(placed[[1]]$.place, "5-10-C-CCATG")
+})
+
+test_that("an rsID search ignores a ClinVar block that is another allele's", {
+  hits <- list(
+    list(`_id` = "chr17:g.43057065dup", clinvar = list(rsid = "rs80357906")),
+    list(
+      `_id` = "chr17:g.43057062_43057063dup",
+      dbsnp = list(rsid = "rs2051500205"),
+      clinvar = list(rsid = "rs80357906")
+    )
+  )
+  res <- myvariant_pick_allele(hits, "rs80357906", "No annotation found for")
+  expect_true(res$ok)
+  expect_equal(res$hit$`_id`, "chr17:g.43057065dup")
+})
+
+test_that(".mv_better_record() prefers a record whose id names the allele", {
+  misnamed <- list(.id_ok = FALSE, clinvar = list(variant_id = 94392))
+  named <- list(.id_ok = TRUE)
+  expect_true(.mv_better_record(named, misnamed))
+  expect_false(.mv_better_record(misnamed, named))
+  # Both named: the one with a ClinVar record.
+  expect_true(.mv_better_record(
+    list(.id_ok = TRUE, clinvar = list(variant_id = 1)),
+    named
+  ))
+})
+
+test_that("gnomad_allele_frequency() does not claim absence it cannot check", {
+  orig <- gnomad_frequency
+  gnomad_frequency <<- function(...) stop("gnomAD should not be asked")
+  on.exit(gnomad_frequency <<- orig, add = TRUE)
+  expect_match(
+    gnomad_allele_frequency("rs199474657", "MT-3243-A-G")$error,
+    "mitochondrial"
+  )
+  expect_match(
+    gnomad_allele_frequency("rs121913227", "7-140753335-CA-TT")$error,
+    "each base of a multi-base change"
+  )
+})
+
+test_that("myvariant_hgvsp() takes an indel's change on the lowest RefSeq number", {
+  # MSH6 c.3261dup: a shorter isoform comes first in snpEff's list.
+  hit <- list(
+    snpeff = list(
+      ann = list(
+        list(feature_id = "NM_001281492.2", hgvs_p = "p.Phe786fs"),
+        list(feature_id = "NM_001281493.2", hgvs_p = "p.Phe786fs"),
+        list(feature_id = "NM_000179.3", hgvs_p = "p.Phe1088fs")
+      )
+    )
+  )
+  expect_equal(myvariant_hgvsp(hit), "p.Phe1088fs")
+})
+
+test_that("myvariant_gene() skips genes snpEff names only for being near", {
+  # MT-TL1 m.3243A>G: snpEff lists RNR1 and RNR2 as downstream genes.
+  hit <- list(
+    clinvar = list(gene = list(symbol = "MT-TL1")),
+    snpeff = list(
+      ann = list(
+        list(effect = "downstream_gene_variant", genename = "RNR1"),
+        list(effect = "downstream_gene_variant", genename = "RNR2")
+      )
+    )
+  )
+  expect_equal(myvariant_gene(hit), "MT-TL1")
+  hit$clinvar <- NULL
+  expect_true(is.na(myvariant_gene(hit)))
+})

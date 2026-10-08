@@ -53,12 +53,18 @@ myvariant_fetch_allele <- function(variant, fields, not_found) {
     "clinvar.variant_id",
     "clinvar.rsid",
     "clinvar.gene.symbol",
+    "clinvar.chrom",
+    "clinvar.hg38",
+    "clinvar.ref",
+    "clinvar.alt",
     "dbnsfp.genename",
     "dbnsfp.aa",
     "dbnsfp.uniprot",
     "dbnsfp.hgvsp",
     "dbnsfp.hgvsc",
     "snpeff.ann.genename",
+    "snpeff.ann.effect",
+    "snpeff.ann.feature_id",
     "snpeff.ann.hgvs_p",
     "snpeff.ann.hgvs_c"
   )
@@ -76,7 +82,263 @@ myvariant_fetch_allele <- function(variant, fields, not_found) {
   if (!res$ok) {
     return(list(ok = FALSE, error = res$error))
   }
-  myvariant_pick_allele(res$data$hits, term, not_found)
+  myvariant_pick_allele(myvariant_place_hits(res$data$hits), term, not_found)
+}
+
+# Give hits their leftmost GRCh38 position, stored as `.place`, a
+# chrom-pos-ref-alt id like gnomAD's.
+#
+# MyVariant leaves some records without VCF fields (BRCA1 185delAG is only
+# chr17:g.43124028CT[1]), and writes an indel in a repeat at whatever
+# position its source used. With the reference sequence, both become one
+# exact form: the record's HGVS id is turned into a VCF record, then moved to
+# its leftmost position. That lets gnomAD and VEP look up records with no VCF
+# fields, and lets one indel written two ways count as one allele.
+#
+# One reference fetch covers all the hits, and it is only made when it can
+# change something: a hit without VCF fields, or two or more indels. Without
+# the reference, hits are returned as they came.
+myvariant_place_hits <- function(hits, margin = 200L) {
+  vcfs <- lapply(hits, myvariant_vcf)
+  ids <- vapply(
+    hits,
+    function(h) as.character(pluck_at(h, "_id", default = NA_character_)),
+    character(1)
+  )
+  is_indel <- vapply(
+    vcfs,
+    function(v) !is.null(v) && nchar(v$ref) != nchar(v$alt),
+    logical(1)
+  )
+  unplaced <- vapply(vcfs, is.null, logical(1))
+  if (length(hits) == 0 || !(any(unplaced) || sum(is_indel) >= 2)) {
+    return(hits)
+  }
+
+  spans <- lapply(seq_along(hits), function(i) {
+    if (!is.null(vcfs[[i]])) {
+      return(c(vcfs[[i]]$pos, vcfs[[i]]$pos + nchar(vcfs[[i]]$ref)))
+    }
+    .mv_hgvs_span(ids[[i]])
+  })
+  chroms <- unique(stats::na.omit(c(
+    vapply(vcfs, function(v) if (is.null(v)) NA_character_ else v$chrom, ""),
+    vapply(ids, .mv_hgvs_chrom, "")
+  )))
+  spans <- Filter(Negate(is.null), spans)
+  if (length(chroms) != 1 || length(spans) == 0) {
+    return(hits)
+  }
+  from <- max(1L, min(unlist(spans)) - margin)
+  to <- max(unlist(spans)) + margin
+  if (to - from > 10000L) {
+    return(hits)
+  }
+  seq <- vr_reference_sequence(chroms, from, to)
+  if (is.null(seq)) {
+    return(hits)
+  }
+  ref_at <- function(start, end) {
+    if (start < from || end > to || end < start) {
+      return(NULL)
+    }
+    substr(seq, start - from + 1L, end - from + 1L)
+  }
+
+  # A VCF record as its leftmost id, or NA when its ref is not the reference
+  # (a record built from a wrong id) or it cannot be moved.
+  place_of <- function(vcf) {
+    if (is.null(vcf)) {
+      return(NA_character_)
+    }
+    if (!identical(ref_at(vcf$pos, vcf$pos + nchar(vcf$ref) - 1L), vcf$ref)) {
+      return(NA_character_)
+    }
+    moved <- if (nchar(vcf$ref) == nchar(vcf$alt)) {
+      .mv_trim_same_length(vcf$pos, vcf$ref, vcf$alt)
+    } else {
+      vr_left_align(
+        vcf$pos,
+        vcf$ref,
+        vcf$alt,
+        ref_at(from, vcf$pos - 1L) %||% ""
+      )
+    }
+    if (is.null(moved)) {
+      return(NA_character_)
+    }
+    paste(vcf$chrom, moved$pos, moved$ref, moved$alt, sep = "-")
+  }
+
+  for (i in seq_along(hits)) {
+    candidates <- c(
+      myvariant_vcf_candidates(hits[[i]]),
+      list(.mv_hgvs_to_vcf(ids[[i]], ref_at))
+    )
+    places <- vapply(candidates, place_of, character(1))
+    places <- places[!is.na(places)]
+    if (length(places) > 0) {
+      hits[[i]]$.place <- places[[1]]
+      # Whether the hit's own HGVS id names this same change. When one
+      # allele has several records, the list shows one whose id does.
+      hits[[i]]$.id_ok <- identical(
+        place_of(.mv_hgvs_to_vcf(ids[[i]], ref_at)),
+        places[[1]]
+      )
+    }
+  }
+  hits
+}
+
+# A change whose ref and alt are the same length, without the bases they
+# share at either end (17-102-CTC-CGG becomes 17-103-TC-GG), the form gnomAD
+# uses. One base is always kept.
+.mv_trim_same_length <- function(pos, ref, alt) {
+  while (nchar(ref) > 1 && substr(ref, 1, 1) == substr(alt, 1, 1)) {
+    ref <- substring(ref, 2)
+    alt <- substring(alt, 2)
+    pos <- pos + 1L
+  }
+  while (
+    nchar(ref) > 1 &&
+      substr(ref, nchar(ref), nchar(ref)) == substr(alt, nchar(alt), nchar(alt))
+  ) {
+    ref <- substr(ref, 1, nchar(ref) - 1)
+    alt <- substr(alt, 1, nchar(alt) - 1)
+  }
+  list(pos = pos, ref = ref, alt = alt)
+}
+
+# The chromosome of a genomic HGVS id ("chr7:g.140753336A>T" -> "7"), or NA.
+# The mitochondrion is "MT", as MyVariant and Ensembl name it.
+.mv_hgvs_chrom <- function(id) {
+  if (!grepl("^chr(?:[0-9]+|X|Y|MT|M):g\\.", id, perl = TRUE)) {
+    return(NA_character_)
+  }
+  chrom <- sub("^chr([0-9]+|X|Y|MT|M):.*$", "\\1", id, perl = TRUE)
+  if (chrom == "M") "MT" else chrom
+}
+
+# The first and last position a genomic HGVS id names, or NULL.
+.mv_hgvs_span <- function(id) {
+  m <- regmatches(
+    id,
+    regexec(
+      "^chr(?:[0-9]+|X|Y|MT|M):g\\.([0-9]+)(?:_([0-9]+))?",
+      id,
+      perl = TRUE
+    )
+  )[[1]]
+  if (length(m) == 0) {
+    return(NULL)
+  }
+  start <- as.integer(m[[2]])
+  end <- if (nzchar(m[[3]])) as.integer(m[[3]]) else start
+  c(start, end)
+}
+
+# Pure helper: a MyVariant genomic HGVS id as a VCF record, list(chrom, pos,
+# ref, alt), or NULL for a form it does not read. `ref_at(start, end)` returns
+# reference bases, or NULL. The forms MyVariant uses:
+#   chr7:g.140753336A>T          substitution
+#   chr13:g.20189552del          deletion (also S_Edel)
+#   chr17:g.43057065dup          duplication (also S_Edup)
+#   chr1:g.100_101insAT          insertion
+#   chr1:g.100_102delinsAT       deletion-insertion (also Sdelins)
+#   chr17:g.43124028CT[1]        repeat: the unit at that position, as many
+#                                times as the number says
+.mv_hgvs_to_vcf <- function(id, ref_at) {
+  chrom <- .mv_hgvs_chrom(id)
+  if (is.na(chrom)) {
+    return(NULL)
+  }
+  body <- sub("^chr(?:[0-9]+|X|Y|MT|M):g\\.", "", id, perl = TRUE)
+  num <- function(x) suppressWarnings(as.integer(x))
+  vcf <- function(pos, ref, alt) {
+    if (is.null(ref) || is.null(alt) || is.na(pos) || !nzchar(ref)) {
+      return(NULL)
+    }
+    list(chrom = chrom, pos = pos, ref = ref, alt = alt)
+  }
+
+  if (grepl("^[0-9]+[ACGT]>[ACGT]$", body)) {
+    pos <- num(sub("[ACGT]>[ACGT]$", "", body))
+    return(vcf(
+      pos,
+      substr(body, nchar(body) - 2, nchar(body) - 2),
+      substr(body, nchar(body), nchar(body))
+    ))
+  }
+  m <- regmatches(
+    body,
+    regexec(
+      "^([0-9]+)(?:_([0-9]+))?(delins|del|dup|ins)([ACGT]*)$",
+      body,
+      perl = TRUE
+    )
+  )[[1]]
+  if (length(m) > 0) {
+    start <- num(m[[2]])
+    end <- if (nzchar(m[[3]])) num(m[[3]]) else start
+    kind <- m[[4]]
+    bases <- m[[5]]
+    if (is.na(start) || is.na(end) || end < start) {
+      return(NULL)
+    }
+    before <- ref_at(start - 1L, start - 1L)
+    span <- ref_at(start, end)
+    if (kind == "del") {
+      return(vcf(start - 1L, paste0(before, span), before))
+    }
+    if (kind == "dup") {
+      last <- ref_at(end, end)
+      return(vcf(end, last, paste0(last, span)))
+    }
+    if (kind == "ins" && nzchar(bases)) {
+      first <- ref_at(start, start)
+      return(vcf(start, first, paste0(first, bases)))
+    }
+    if (kind == "delins" && nzchar(bases)) {
+      return(vcf(start - 1L, paste0(before, span), paste0(before, bases)))
+    }
+    return(NULL)
+  }
+  m <- regmatches(body, regexec("^([0-9]+)([ACGT]+)\\[([0-9]+)\\]$", body))[[1]]
+  if (length(m) > 0) {
+    start <- num(m[[2]])
+    unit <- m[[3]]
+    copies <- num(m[[4]])
+    size <- nchar(unit)
+    # Count the copies the reference has from `start`.
+    have <- 0L
+    repeat {
+      piece <- ref_at(start + have * size, start + (have + 1L) * size - 1L)
+      # Past the end of the reference fetched: the count would be too low.
+      if (is.null(piece) || have > 1000L) {
+        return(NULL)
+      }
+      if (!identical(piece, unit)) {
+        break
+      }
+      have <- have + 1L
+    }
+    if (have == 0L || is.na(copies) || copies == have) {
+      return(NULL)
+    }
+    last <- start + have * size - 1L
+    if (copies < have) {
+      drop_from <- start + copies * size
+      before <- ref_at(drop_from - 1L, drop_from - 1L)
+      return(vcf(
+        drop_from - 1L,
+        paste0(before, ref_at(drop_from, last)),
+        before
+      ))
+    }
+    anchor <- ref_at(last, last)
+    return(vcf(last, anchor, paste0(anchor, strrep(unit, copies - have))))
+  }
+  NULL
 }
 
 # Pure helper for myvariant_fetch_allele(): the one hit, or an error naming
@@ -100,9 +362,14 @@ myvariant_pick_allele <- function(hits, term, not_found) {
     own <- vapply(
       hits,
       function(h) {
+        # A ClinVar block that belongs to another allele does not make the
+        # record this rsID (MyVariant files rs80357906's ClinVar block under
+        # rs2051500205's TG duplication).
         ids <- tolower(c(
           unlist(pluck_at(h, "dbsnp", "rsid"), use.names = FALSE),
-          unlist(pluck_at(h, "clinvar", "rsid"), use.names = FALSE)
+          if (.mv_clinvar_is_own(h)) {
+            unlist(pluck_at(h, "clinvar", "rsid"), use.names = FALSE)
+          }
         ))
         tolower(term) %in% ids
       },
@@ -192,21 +459,35 @@ myvariant_distinct_alleles <- function(hits) {
   kept <- list()
   for (hit in hits[real]) {
     vcf <- myvariant_vcf(hit)
+    place <- hit$.place
     same <- which(vapply(
       kept,
-      function(k) .mv_same_change(myvariant_vcf(k), vcf),
+      function(k) {
+        (!is.null(place) && identical(k$.place, place)) ||
+          .mv_same_change(myvariant_vcf(k), vcf)
+      },
       logical(1)
     ))
     if (length(same) == 0) {
       kept[[length(kept) + 1]] <- hit
-    } else if (
-      is_blank(pluck_at(kept[[same[[1]]]], "clinvar", "variant_id")) &&
-        !is_blank(pluck_at(hit, "clinvar", "variant_id"))
-    ) {
+    } else if (.mv_better_record(hit, kept[[same[[1]]]])) {
       kept[[same[[1]]]] <- hit
     }
   }
   kept
+}
+
+# Which of two records of one allele the list shows: first one whose HGVS id
+# names the allele (see myvariant_place_hits(); MyVariant misnames some), then
+# one with a ClinVar record.
+.mv_better_record <- function(hit, kept) {
+  id_ok <- isTRUE(hit$.id_ok)
+  kept_id_ok <- isTRUE(kept$.id_ok)
+  if (id_ok != kept_id_ok) {
+    return(id_ok)
+  }
+  is_blank(pluck_at(kept, "clinvar", "variant_id")) &&
+    !is_blank(pluck_at(hit, "clinvar", "variant_id"))
 }
 
 # TRUE when two VCF records (see myvariant_vcf()) make the same edit to the
@@ -362,7 +643,8 @@ myvariant_parse_hit <- function(hit, term = NA_character_) {
     } else {
       NA_character_
     },
-    vcf_id = myvariant_vcf_id(hit)
+    # The leftmost position when myvariant_place_hits() found one.
+    vcf_id = hit$.place %||% myvariant_vcf_id(hit)
   )
 }
 
@@ -389,14 +671,34 @@ myvariant_rsid <- function(hit) {
 }
 
 # The hit's gene. dbNSFP covers only single-base substitutions, so an indel or
-# a non-coding change takes snpEff's gene, then ClinVar's.
+# a non-coding change takes ClinVar's gene, then snpEff's. snpEff also names
+# genes the variant is only near (MT-TL1 m.3243A>G is "downstream" of RNR1),
+# so those annotations do not count.
 myvariant_gene <- function(hit) {
   gene <- mygene_first(pluck_at(hit, "dbnsfp", "genename"))
-  if (is_blank(gene)) {
-    gene <- mygene_first(.mv_snpeff_field(hit, "genename"))
-  }
   if (is_blank(gene) && .mv_clinvar_is_own(hit)) {
     gene <- mygene_first(pluck_at(hit, "clinvar", "gene", "symbol"))
+  }
+  if (is_blank(gene)) {
+    ann <- pluck_at(hit, "snpeff", "ann")
+    if (!is.null(names(ann))) {
+      ann <- list(ann)
+    }
+    inside <- Filter(
+      function(a) {
+        !pluck_at(a, "effect", default = "") %in%
+          c(
+            "upstream_gene_variant",
+            "downstream_gene_variant",
+            "intergenic_region"
+          )
+      },
+      ann
+    )
+    gene <- mygene_first(.mv_snpeff_field(
+      list(snpeff = list(ann = inside)),
+      "genename"
+    ))
   }
   gene
 }
@@ -453,6 +755,28 @@ myvariant_hgvsp <- function(hit) {
     if (length(named) > 0) {
       return(named[[1]])
     }
+  }
+  # Without dbNSFP (indels, mostly), take snpEff's change on the gene's
+  # lowest-numbered RefSeq transcript, usually its reference one: MSH6's
+  # NM_000179 gives p.Phe1088fs where a shorter isoform gives p.Phe786fs.
+  ann <- pluck_at(hit, "snpeff", "ann")
+  if (!is.null(names(ann))) {
+    ann <- list(ann)
+  }
+  tx <- vapply(
+    ann,
+    function(a) as.character(pluck_at(a, "feature_id", default = NA)),
+    character(1)
+  )
+  change <- vapply(
+    ann,
+    function(a) as.character(pluck_at(a, "hgvs_p", default = NA)),
+    character(1)
+  )
+  on_refseq <- !is.na(change) & nzchar(change) & grepl("^NM_[0-9]+", tx)
+  if (any(on_refseq)) {
+    number <- as.numeric(sub("^NM_0*([0-9]+).*$", "\\1", tx[on_refseq]))
+    return(change[on_refseq][[which.min(number)]])
   }
   if (length(snpeff) > 0) {
     counts <- table(factor(snpeff, levels = unique(snpeff)))
@@ -511,18 +835,64 @@ myvariant_hgvsp_all <- function(hit) {
   unique(changes[grepl("^p\\.[A-Z][a-z]{2}[0-9]", changes)])
 }
 
-# The hit's GRCh38 VCF record as list(chrom, pos, ref, alt), or NULL when a
-# field is missing.
+# The hit's GRCh38 VCF record as list(chrom, pos, ref, alt), or NULL: the most
+# trusted of myvariant_vcf_candidates().
 myvariant_vcf <- function(hit) {
-  chrom <- as.character(pluck_at(hit, "chrom", default = NA))
-  pos <- suppressWarnings(as.integer(pluck_at(hit, "vcf", "position")))
-  ref <- as.character(pluck_at(hit, "vcf", "ref", default = NA))
-  alt <- as.character(pluck_at(hit, "vcf", "alt", default = NA))
-  parts <- c(chrom, ref, alt)
-  if (length(pos) != 1 || is.na(pos) || anyNA(parts) || !all(nzchar(parts))) {
-    return(NULL)
+  candidates <- myvariant_vcf_candidates(hit)
+  if (length(candidates) == 0) NULL else candidates[[1]]
+}
+
+# The hit's possible VCF records, most trusted first: its own ClinVar block
+# (see .mv_clinvar_is_own()), then its VCF fields. MyVariant builds the VCF
+# fields from its HGVS id, and the id can be wrong while the ClinVar block is
+# right: GJB2 35dupG is named chr13:g.20189546_20189547dup, a two-base
+# duplication, and NPM1's insertions carry the wrong inserted bases. With the
+# reference at hand, myvariant_place_hits() keeps the first one whose ref
+# matches it.
+myvariant_vcf_candidates <- function(hit) {
+  make <- function(chrom, pos, ref, alt) {
+    chrom <- as.character(chrom %||% NA)
+    pos <- suppressWarnings(as.integer(pos %||% NA))
+    ref <- as.character(ref %||% NA)
+    alt <- as.character(alt %||% NA)
+    if (
+      length(pos) != 1 ||
+        is.na(pos) ||
+        anyNA(c(chrom, ref, alt)) ||
+        !all(grepl("^[ACGTN]+$", c(ref, alt))) ||
+        !nzchar(chrom)
+    ) {
+      return(NULL)
+    }
+    list(chrom = chrom, pos = pos, ref = ref, alt = alt)
   }
-  list(chrom = chrom, pos = pos, ref = ref, alt = alt)
+  from_vcf <- make(
+    pluck_at(hit, "chrom"),
+    pluck_at(hit, "vcf", "position"),
+    pluck_at(hit, "vcf", "ref"),
+    pluck_at(hit, "vcf", "alt")
+  )
+  from_clinvar <- NULL
+  if (.mv_clinvar_is_own(hit)) {
+    # ClinVar's ref and alt are VCF style, with the base before an indel, but
+    # for a deletion its start is the first deleted base, one past that base.
+    ref <- as.character(pluck_at(hit, "clinvar", "ref", default = NA))
+    alt <- as.character(pluck_at(hit, "clinvar", "alt", default = NA))
+    start <- suppressWarnings(as.integer(
+      pluck_at(hit, "clinvar", "hg38", "start", default = NA)
+    ))
+    is_deletion <- !anyNA(c(ref, alt)) &&
+      nchar(ref) > nchar(alt) &&
+      startsWith(ref, substr(alt, 1, 1))
+    from_clinvar <- make(
+      pluck_at(hit, "clinvar", "chrom") %||% pluck_at(hit, "chrom"),
+      if (is_deletion) start - 1L else start,
+      ref,
+      alt
+    )
+  }
+  candidates <- Filter(Negate(is.null), list(from_clinvar, from_vcf))
+  candidates[!duplicated(candidates)]
 }
 
 # The allele as chrom-pos-ref-alt ("7-140753336-A-T"), the form gnomAD uses for

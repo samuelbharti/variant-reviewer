@@ -121,8 +121,30 @@ gnomad_allele_frequency <- function(rsid, vcf_id, dataset = GNOMAD_DATASET) {
   if (is_blank(vcf_id)) {
     return(vr_allele_unplaced("gnomAD"))
   }
-  res <- gnomad_frequency(rsid, dataset, variant_id = vcf_id)
   v <- .mv_parse_vcf_id(vcf_id)
+  # Two kinds of change gnomAD does keep, but not where this lookup asks, so
+  # "no record" would be false: mitochondrial variants sit in a separate
+  # dataset, and a multi-base substitution is listed one base at a time.
+  if (!is.null(v) && v$chrom %in% c("MT", "M")) {
+    return(list(
+      ok = FALSE,
+      error = paste(
+        "gnomAD keeps mitochondrial variants in a separate dataset,",
+        "which this card does not read yet."
+      )
+    ))
+  }
+  if (!is.null(v) && nchar(v$ref) == nchar(v$alt) && nchar(v$ref) > 1) {
+    return(list(
+      ok = FALSE,
+      error = paste(
+        "gnomAD lists each base of a multi-base change on its own, so",
+        vcf_id,
+        "has no single gnomAD record to show."
+      )
+    ))
+  }
+  res <- gnomad_frequency(rsid, dataset, variant_id = vcf_id)
   is_indel <- !is.null(v) && nchar(v$ref) != nchar(v$alt)
   if (isTRUE(res$ok) || !isTRUE(res$missing) || !is_indel) {
     return(res)
