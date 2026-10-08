@@ -19,8 +19,6 @@ All notable changes to this project should be documented in this file.
   score now comes from dbNSFP (29.8 for BRAF V600E, was 32).
 - An HGVS string typed into the Variant box never found anything, because
   MyVariant needs it in quotes.
-- The protein change could name a minor isoform (p.Val640Glu for BRAF V600E).
-  It now comes from snpEff, on the RefSeq transcript.
 - MyVariant can hold one indel twice, shifted a few bases inside a repeat.
   Those now count as one allele (CFTR F508del). Records that are not alleles
   (ref equal to alt, or a ref that is not the reference base) are dropped, so
@@ -35,8 +33,8 @@ All notable changes to this project should be documented in this file.
   on, the card says the records could not be matched, not that there are none.
 - The protein change is numbered on the reviewed UniProt protein, the one the
   protein and structure cards use, not on whichever transcript was listed
-  first (TP53 R175H, not R136H; APOE R176C, not R202C). The variant
-  suggestions use the same numbering.
+  first (BRAF V600E, not V640E; TP53 R175H, not R136H; APOE R176C, not
+  R202C). The variant suggestions use the same numbering.
 - An indel in a repeat can have a different cDNA name in snpEff and ClinVar
   (GJB2 35delG is c.30del and c.35del), so its ClinVar record is also matched
   on its protein change.
@@ -237,7 +235,7 @@ All notable changes to this project should be documented in this file.
 - Gave the assistant app-scoped tools: `get_current_selection` and `read_card`
   (read the gene/variant and any card's data), and `set_selection` (load a
   gene/variant into the dashboard). The assistant works through the app's own
-  data and lookups rather than searching externally. Result modules now return
+  data and lookups instead of searching externally. Result modules now return
   their data reactive so the parent can surface it.
 - Added a footer (app version, author, source/license links) shown on every
   page.
