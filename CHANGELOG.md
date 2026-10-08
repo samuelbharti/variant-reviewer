@@ -4,6 +4,8 @@ All notable changes to this project should be documented in this file.
 
 ## [Unreleased]
 
+## [2.3.4] - 2026-10-08
+
 ### Fixed
 
 - The BRAF V600E example showed V600A on the Variant card and V600G's ClinVar
