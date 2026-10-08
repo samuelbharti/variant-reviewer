@@ -49,9 +49,29 @@ All notable changes to this project should be documented in this file.
   pinned to the previous release. Both now give the concept DOI,
   `10.5281/zenodo.21934011`, which resolves to the latest version and matches
   the README badge.
+- Some alleles have no genomic position in MyVariant (BRCA1 185delAG and
+  5382insC, GJB2 35dupG), so gnomAD and VEP could not look them up (#30).
+  Their position now comes from their own ClinVar block, or from their HGVS
+  id and the reference sequence (from UCSC, with Ensembl as the fallback).
+  Where MyVariant's position was built from a wrong id (NPM1 insertions), the
+  one that matches the reference is used.
+- One indel written at different places in a repeat now appears once in an
+  rsID's allele list (GJB2 35delG was listed twice), under a correctly
+  spelled id. Records that belong to another rsID are left out (rs80357906).
+- ClinVar records are matched on their exact change (canonical SPDI) before
+  their title, so an allele with no cDNA or protein name still finds its
+  record.
+- gnomAD no longer says "no record" for a mitochondrial variant or a
+  multi-base substitution, which it keeps in a separate dataset or one base
+  at a time. The card says so.
+- An indel's protein change is taken from the gene's reference RefSeq
+  transcript (MSH6 p.Phe1088fs, not p.Phe786fs), and a gene snpEff names only
+  because the variant is near it is not used (MT-TL1, not RNR1).
 
 ### Added
 
+- When an rsID covers more than one allele, the alleles are added to the
+  Variant box, so you can pick one from the list the cards point to.
 - `CITATION.cff` lists the DOI of every released version, so citing one
   specific version no longer means looking the record up on Zenodo. It also
   carries `date-released` and an ORCID, and moves to CFF 1.2.0.
