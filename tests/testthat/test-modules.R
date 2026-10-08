@@ -198,3 +198,48 @@ test_that("gnomad_allele_frequency() moves an unknown indel left before giving u
   expect_null(res$missing)
   expect_match(res$error, "does not show the variant is missing")
 })
+
+test_that("an rsID's alleles are offered in the Variant box", {
+  # Spy on the selectize updates the module makes. The module is defined in
+  # the global environment, so a function of the same name there is found
+  # before shiny's.
+  sent <- NULL
+  assign(
+    "updateSelectizeInput",
+    function(session, inputId, choices = NULL, selected = NULL, ...) {
+      sent <<- list(choices = choices, selected = selected)
+    },
+    envir = globalenv()
+  )
+  on.exit(rm("updateSelectizeInput", envir = globalenv()), add = TRUE)
+
+  requested <- reactiveVal(NULL)
+  alleles <- reactiveVal(NULL)
+  testServer(
+    gene_search_server,
+    args = list(requested = requested, allele_choices = alleles),
+    {
+      # The assistant searches an rsID; the browser still shows the old value.
+      session$setInputs(variant = "chr7:g.140753336A>T")
+      requested(list(gene = "", variant = "rs80338939", nonce = 1L))
+      session$flushReact()
+      alleles(c(
+        "p.Gly12fs (chr13:g.20189547del)" = "chr13:g.20189547del",
+        "chr13:g.20189546_20189547dup" = "chr13:g.20189546_20189547dup"
+      ))
+      session$flushReact()
+      expect_true("chr13:g.20189547del" %in% sent$choices)
+      expect_true("p.Gly12fs (chr13:g.20189547del)" %in% names(sent$choices))
+      # The searched rsID stays selected, not the stale browser value.
+      expect_equal(sent$selected, "rs80338939")
+
+      # The next search has no alleles: the old ones leave the list.
+      requested(list(gene = "", variant = "chr12:g.25245350C>T", nonce = 2L))
+      session$flushReact()
+      alleles(NULL)
+      session$flushReact()
+      expect_false("chr13:g.20189547del" %in% sent$choices)
+      expect_equal(sent$selected, "chr12:g.25245350C>T")
+    }
+  )
+})
