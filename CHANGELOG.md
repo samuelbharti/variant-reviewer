@@ -4,6 +4,8 @@ All notable changes to this project should be documented in this file.
 
 ## [Unreleased]
 
+## [2.3.5] - 2026-10-08
+
 ### Changed
 
 - The Variant list no longer adds a classification such as "(Pathogenic)"
