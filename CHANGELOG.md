@@ -4,6 +4,18 @@ All notable changes to this project should be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- The Variant list no longer adds a classification such as "(Pathogenic)"
+  after each suggestion. It showed the most severe single ClinVar submission,
+  not ClinVar's own classification: BRAF V600E was "(Pathogenic)" while
+  ClinVar calls it "Conflicting classifications of pathogenicity". The list
+  is now sorted by protein position, shows every variant it fetched, and its
+  hint says how it was chosen and how many there are in all.
+- The Variant card no longer has a "ClinVar" line, which listed the same
+  per-submission values and could contradict the ClinVar card. The ClinVar
+  card is the one place for the classification.
+
 ## [2.3.4] - 2026-10-08
 
 ### Fixed
