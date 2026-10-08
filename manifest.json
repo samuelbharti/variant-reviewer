@@ -3118,7 +3118,7 @@
       "checksum": "6a7f819b95e099c83fdbd2de6e63511f"
     },
     ".Rbuildignore": {
-      "checksum": "1b420ea32dce69ecfff048f56ba79ad2"
+      "checksum": "5b8a4b50647e70a8dc3ca2dcac74706c"
     },
     ".Rprofile": {
       "checksum": "fa5f3a63306060721eb9335aeb817d06"
@@ -3133,10 +3133,10 @@
       "checksum": "2d92dc21f535aef92c98a1aab357fc0a"
     },
     "CITATION.cff": {
-      "checksum": "43a65da78ba5b21368c8683a22345980"
+      "checksum": "603826c231e0c203f530f0724d97b14a"
     },
     "CITATION.md": {
-      "checksum": "2aac0fd25c55eef644135d90a8ede390"
+      "checksum": "5dc529afa9afc1e59f5393b8759a4444"
     },
     "data/.gitkeep": {
       "checksum": "d41d8cd98f00b204e9800998ecf8427e"
@@ -3148,7 +3148,7 @@
       "checksum": "a743e2569d4c310e7eb0228734e76e6f"
     },
     "LICENSE": {
-      "checksum": "fac71f83b41ea4a5f56210db1037ccfb"
+      "checksum": "630a05bed5ddd5e88f80aed4b7688456"
     },
     "modules/byok_chat_mod.R": {
       "checksum": "3fc9908df58e0a2f5ba7602da0302399"
@@ -3157,7 +3157,7 @@
       "checksum": "c10b03d0888cd222ae0e4b0ab41ff8aa"
     },
     "modules/conservation_mod.R": {
-      "checksum": "0bae762c241af98826a1ea03aa891b6c"
+      "checksum": "86b3237bbce32555fe0c4d28b1f73e55"
     },
     "modules/drugs_mod.R": {
       "checksum": "465abdefd666e3558e2b8566082362de"
@@ -3172,7 +3172,7 @@
       "checksum": "eb41fdef06019393a2cd3e8b9ffda565"
     },
     "modules/gene_model_mod.R": {
-      "checksum": "9da94f4b1df5e79c9e416cdb70194d99"
+      "checksum": "f817c23a1ab0a6fd6b515d1e89de6ad6"
     },
     "modules/gene_search_mod.R": {
       "checksum": "9284e6720cbe99f7825b9be8a0fa218b"
@@ -3268,7 +3268,7 @@
       "checksum": "efc60d08d0dfe12d3415c97ec6edb523"
     },
     "R/chat_tools.R": {
-      "checksum": "d3e0993d2828da75cedb968cec96e92b"
+      "checksum": "6c4c6a2e71dd7026b2478773230d2311"
     },
     "R/demo_cache.R": {
       "checksum": "eebfdc0320b6f5a683e45ac4fc77233b"
@@ -3283,19 +3283,19 @@
       "checksum": "220d5c5c89acc9646668f3ccb666590f"
     },
     "R/ui_helpers.R": {
-      "checksum": "9b4dd49de1ec24b715f155cfaee147d9"
+      "checksum": "74b024fdcaf533332086df147cb3f2fa"
     },
     "R/utils.R": {
       "checksum": "7cbf071569acd211d8d431447d1e0abe"
     },
     "R/validate.R": {
-      "checksum": "944732407c61e0b62a40704efe7ed783"
+      "checksum": "9e0fc98a808b90986e4a8f6b91962a56"
     },
     "README.md": {
       "checksum": "72d19e85af2df503f754c38840f659e8"
     },
     "renv.lock": {
-      "checksum": "84f9c11f21882700e10d27df4837dda9"
+      "checksum": "446b7eac6ac747af29d284d628925300"
     },
     "userInterface/about_ui.R": {
       "checksum": "10e74014b0deb38d6b28558b567c6574"
