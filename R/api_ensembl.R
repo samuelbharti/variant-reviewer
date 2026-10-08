@@ -79,16 +79,71 @@ ensembl_vep_region <- function(vcf_id) {
 }
 
 # Bases of the GRCh38 reference from `start` to `end` (1-based, inclusive), or
-# NULL when Ensembl cannot be reached.
-ensembl_sequence <- function(chrom, start, end) {
-  res <- vr_api_get(
-    ENSEMBL_BASE,
-    path = paste0("sequence/region/human/", chrom, ":", start, "..", end, ":1"),
-    query = list(`content-type` = "application/json"),
-    source = "Ensembl"
-  )
-  seq <- if (isTRUE(res$ok)) pluck_at(res$data, "seq") else NULL
-  if (is_blank(seq)) NULL else toupper(as.character(seq))
+# NULL when neither source answers. UCSC's genome API comes first: it answers
+# in well under a second, while Ensembl's sequence endpoint often takes 10 s
+# or more. Ensembl is the fallback.
+#
+# The sequence only refines a lookup, and every session waits on it (the app
+# fetches synchronously in one R process), so each source gets one short try.
+# After a source fails it is not asked again for REFERENCE_PAUSE seconds:
+# failures are not cached, and without the pause each allele lookup would
+# wait out the timeout again.
+REFERENCE_PAUSE <- 60
+.reference_state <- new.env(parent = emptyenv())
+
+UCSC_API <- "https://api.genome.ucsc.edu"
+
+vr_reference_sequence <- function(chrom, start, end) {
+  for (source in c("UCSC", "Ensembl")) {
+    if (as.numeric(Sys.time()) < (.reference_state[[source]] %||% -Inf)) {
+      next
+    }
+    res <- if (source == "UCSC") {
+      # UCSC counts from 0 and leaves out the end; it names chromosomes chr7
+      # and the mitochondrion chrM.
+      vr_api_get(
+        UCSC_API,
+        path = "getData/sequence",
+        query = list(
+          genome = "hg38",
+          chrom = paste0("chr", if (chrom == "MT") "M" else chrom),
+          start = start - 1L,
+          end = end
+        ),
+        source = "UCSC",
+        timeout = 8,
+        max_tries = 1
+      )
+    } else {
+      vr_api_get(
+        ENSEMBL_BASE,
+        path = paste0(
+          "sequence/region/human/",
+          chrom,
+          ":",
+          start,
+          "..",
+          end,
+          ":1"
+        ),
+        query = list(`content-type` = "application/json"),
+        source = "Ensembl",
+        timeout = 8,
+        max_tries = 1
+      )
+    }
+    seq <- if (isTRUE(res$ok)) {
+      pluck_at(res$data, if (source == "UCSC") "dna" else "seq")
+    }
+    if (!is_blank(seq) && nchar(seq) == end - start + 1L) {
+      return(toupper(as.character(seq)))
+    }
+    status <- res$status %||% NA_integer_
+    if (is.na(status) || status >= 500 || status == 429) {
+      .reference_state[[source]] <- as.numeric(Sys.time()) + REFERENCE_PAUSE
+    }
+  }
+  NULL
 }
 
 # An indel's chrom-pos-ref-alt id moved to its leftmost position in a repeat,
@@ -105,7 +160,7 @@ ensembl_left_align <- function(vcf_id, window = 200L) {
     return(vcf_id)
   }
   left <- if (v$pos > 1) {
-    ensembl_sequence(v$chrom, max(1L, v$pos - window), v$pos - 1L)
+    vr_reference_sequence(v$chrom, max(1L, v$pos - window), v$pos - 1L)
   } else {
     ""
   }
