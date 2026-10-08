@@ -39,10 +39,10 @@ test_that("gene_search_server prefetches variant suggestions for the gene", {
         id = "chr7:g.140753336A>T",
         rsid = "rs1",
         label = "V600E",
-        significance = "Pathogenic",
-        cadd = 30,
+        position = 600L,
         stringsAsFactors = FALSE
-      )
+      ),
+      total = 1L
     )
   }
   on.exit(myvariant_gene_variants <<- orig, add = TRUE)
@@ -51,7 +51,7 @@ test_that("gene_search_server prefetches variant suggestions for the gene", {
     session$setInputs(gene = "BRAF")
     session$elapse(700) # advance past the 600ms debounce
     hint <- paste(as.character(output$variant_hint), collapse = " ")
-    expect_match(hint, "known pathogenic")
+    expect_match(hint, "pathogenic or likely pathogenic ClinVar submission")
     expect_match(hint, "BRAF")
   })
 })

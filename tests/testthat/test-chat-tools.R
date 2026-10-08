@@ -32,11 +32,11 @@ test_that("gene and variant summaries include the key fields", {
     rsid = "rs113488022",
     gene = "BRAF",
     hgvsp = "p.Val600Glu",
-    cadd_phred = 32,
-    clinvar_significance = "Pathogenic"
+    cadd_phred = 32
   )
   expect_match(vr_chat_variant(variant), "rs113488022")
-  expect_match(vr_chat_variant(variant), "Pathogenic")
+  # The classification comes from the ClinVar card, not this summary.
+  expect_match(vr_chat_variant(variant), "clinvar card")
 })
 
 test_that("gnomAD summary reports exome/genome allele frequencies", {
